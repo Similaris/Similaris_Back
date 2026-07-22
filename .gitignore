@@ -1,0 +1,18 @@
+# Ambientes virtuais
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Variáveis de ambiente
+.env
+
+# Dados, corpora, modelos e uploads
+data/
+models/
+uploads/
+*.pt
