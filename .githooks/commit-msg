@@ -1,0 +1,35 @@
+#!/bin/sh
+# Similaris - validacao de mensagens de commit (Conventional Commits)
+# Formato exigido: prefixo(escopo opcional): texto em minusculo
+# Prefixos: build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test
+# Limite: 72 caracteres na primeira linha
+
+msg_file="$1"
+first_line=$(head -n1 "$msg_file")
+max_len=72
+
+# ignora mensagens automaticas do git
+case "$first_line" in
+  Merge*|Revert*|fixup!*|squash!*) exit 0 ;;
+esac
+
+len=$(printf '%s' "$first_line" | wc -c | tr -d ' ')
+if [ "$len" -gt "$max_len" ]; then
+  echo "ERRO: primeira linha com $len caracteres (maximo: $max_len)." >&2
+  exit 1
+fi
+
+if ! printf '%s' "$first_line" | grep -Eq '^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._-]+\))?: [a-z0-9]'; then
+  echo "ERRO: mensagem fora do padrao." >&2
+  echo "Use: prefixo: descricao em minusculo" >&2
+  echo "Prefixos: build, chore, ci, docs, feat, fix, perf, refactor, revert, style, test" >&2
+  echo "Exemplo: feat: adiciona endpoint de upload" >&2
+  exit 1
+fi
+
+if printf '%s' "$first_line" | grep -q '[A-Z]'; then
+  echo "ERRO: use somente letras minusculas na primeira linha." >&2
+  exit 1
+fi
+
+exit 0
