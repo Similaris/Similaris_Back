@@ -16,3 +16,4 @@ data/
 models/
 uploads/
 *.pt
+similaris.db

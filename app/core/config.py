@@ -11,6 +11,14 @@ class Settings(BaseSettings):
         "http://localhost:5174",
     ]
 
+    # Banco de dados (SQLite em dev; trocar por PostgreSQL via .env)
+    database_url: str = "sqlite:///./similaris.db"
+
+    # Autenticação JWT
+    secret_key: str = "similaris-dev-secret-troque-em-producao"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 480
+
     class Config:
         env_file = ".env"
 
