@@ -88,4 +88,22 @@ A API ficará disponível em `http://localhost:8000` e a documentação interati
 
 ---
 
+## Padrão de commits
+
+As mensagens de commit são validadas por um hook (`.githooks/commit-msg`) no formato **Conventional Commits**:
+
+```
+prefixo: descrição em minúsculo        (máx. 72 caracteres na primeira linha)
+```
+
+Prefixos aceitos: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. Exemplo: `feat: adiciona endpoint de upload`.
+
+Após clonar o repositório, ative a validação com:
+
+```powershell
+git config core.hooksPath .githooks
+```
+
+---
+
 FATEC Indaiatuba — Dr. Archimedes Lamoglia · Centro Estadual de Educação Tecnológica Paula Souza · 2025/2026
