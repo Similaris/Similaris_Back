@@ -4,6 +4,7 @@ pydantic-settings==2.10.1
 pydantic[email]==2.11.7
 python-multipart==0.0.20
 sqlalchemy==2.0.43
+psycopg2-binary==2.9.10
 bcrypt==4.3.0
 pyjwt==2.10.1
 

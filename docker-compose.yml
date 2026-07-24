@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: similaris-db
+    environment:
+      POSTGRES_USER: similaris
+      POSTGRES_PASSWORD: similaris
+      POSTGRES_DB: similaris
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # executa as migrations na primeira inicialização do banco
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U similaris -d similaris"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: similaris-api
+    environment:
+      DATABASE_URL: postgresql+psycopg2://similaris:similaris@db:5432/similaris
+      SECRET_KEY: ${SECRET_KEY:-similaris-dev-secret-troque-em-producao}
+      CORS_ORIGINS: '["http://localhost:5173","http://localhost:5174"]'
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # redis: descomentar na fase de processamento em lote (Celery)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: similaris-redis
+  #   ports:
+  #     - "6379:6379"
+
+volumes:
+  pgdata:
