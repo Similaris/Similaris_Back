@@ -13,7 +13,7 @@ __pycache__/
 
 # Dados, corpora, modelos e uploads
 data/
-models/
+/models/
 uploads/
 *.pt
 similaris.db
