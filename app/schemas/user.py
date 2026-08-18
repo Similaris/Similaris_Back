@@ -25,5 +25,10 @@ class UserOut(BaseModel):
 
 class TokenOut(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     user: UserOut
+
+
+class RefreshTokenIn(BaseModel):
+    refresh_token: str = Field(min_length=1)
