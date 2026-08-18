@@ -23,7 +23,9 @@ services:
     container_name: similaris-api
     environment:
       DATABASE_URL: postgresql+psycopg2://similaris:similaris@db:5432/similaris
-      SECRET_KEY: ${SECRET_KEY:-similaris-dev-secret-troque-em-producao}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-similaris-dev-secret-troque-em-producao}
+      JWT_ACCESS_TOKEN_EXPIRES_IN: ${JWT_ACCESS_TOKEN_EXPIRES_IN:-480}
+      JWT_REFRESH_TOKEN_EXPIRES_IN: ${JWT_REFRESH_TOKEN_EXPIRES_IN:-10080}
       CORS_ORIGINS: '["http://localhost:5173","http://localhost:5174"]'
     ports:
       - "8000:8000"

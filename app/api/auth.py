@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.user import User
-from app.schemas.user import TokenOut, UserLogin, UserOut, UserRegister
+from app.schemas.user import RefreshTokenIn, TokenOut, UserLogin, UserOut, UserRegister
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -26,8 +26,22 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenOut)
 def login(data: UserLogin, db: Session = Depends(get_db)):
-    token, user = AuthService(db).login(data)
-    return TokenOut(access_token=token, user=UserOut.model_validate(user))
+    access_token, refresh_token, user = AuthService(db).login(data)
+    return TokenOut(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserOut.model_validate(user),
+    )
+
+
+@router.post("/refresh", response_model=TokenOut)
+def refresh(data: RefreshTokenIn, db: Session = Depends(get_db)):
+    access_token, refresh_token, user = AuthService(db).refresh(data.refresh_token)
+    return TokenOut(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserOut.model_validate(user),
+    )
 
 
 @router.get("/me", response_model=UserOut)
