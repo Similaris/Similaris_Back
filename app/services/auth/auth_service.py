@@ -9,9 +9,9 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
-from app.models.user import User
-from app.repositories.user_repository import UserRepository
-from app.schemas.user import UserLogin, UserRegister
+from app.models.auth import User
+from app.repositories.auth import UserRepository
+from app.schemas.auth import UserLogin, UserRegister
 
 
 class AuthService:
@@ -22,7 +22,9 @@ class AuthService:
 
     def register(self, data: UserRegister) -> User:
         if self.users.get_by_email(data.email):
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="E-mail já cadastrado.")
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="E-mail já cadastrado."
+            )
         return self.users.create(
             name=data.name, email=data.email, password_hash=hash_password(data.password)
         )
@@ -30,7 +32,10 @@ class AuthService:
     def login(self, data: UserLogin) -> tuple[str, str, User]:
         user = self.users.get_by_email(data.email)
         if not user or not verify_password(data.password, user.password_hash):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="E-mail ou senha incorretos.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="E-mail ou senha incorretos.",
+            )
         access_token, refresh_token = self._create_token_pair(user)
         return access_token, refresh_token, user
 
@@ -48,7 +53,10 @@ class AuthService:
 
     @staticmethod
     def _invalid_session() -> HTTPException:
-        return HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessão inválida ou expirada.")
+        return HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessão inválida ou expirada.",
+        )
 
     def get_user_by_token(self, token: str) -> User:
         subject = decode_access_token(token)
