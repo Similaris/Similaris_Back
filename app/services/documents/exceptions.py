@@ -8,3 +8,7 @@ class InvalidDocumentError(DocumentExtractionError):
 
 class EmptyDocumentError(DocumentExtractionError):
     """Raised when the document has no extractable text."""
+
+
+class UnsupportedDocumentTypeError(DocumentExtractionError):
+    """Raised when no extractor exists for the document extension."""
