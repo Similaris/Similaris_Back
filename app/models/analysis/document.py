@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 
 
 class Document(Base):
-    """Arquivo enviado pelo usuário para análise de similaridade."""
 
     __tablename__ = "documents"
     __table_args__ = (

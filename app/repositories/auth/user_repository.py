@@ -4,7 +4,6 @@ from app.models.auth import User
 
 
 class UserRepository:
-    """Camada de acesso a dados de usuários."""
 
     def __init__(self, db: Session):
         self.db = db

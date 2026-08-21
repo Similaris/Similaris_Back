@@ -14,7 +14,6 @@ if TYPE_CHECKING:
 
 
 class Batch(Base):
-    """Grupo de documentos submetidos para análise assíncrona."""
 
     __tablename__ = "batches"
     __table_args__ = (

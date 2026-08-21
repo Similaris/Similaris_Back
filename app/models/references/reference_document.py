@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 
 class ReferenceDocument(Base):
-    """Documento que pertence à base de referência."""
 
     __tablename__ = "reference_docs"
     __table_args__ = (Index("ix_reference_docs_source", "source"),)
