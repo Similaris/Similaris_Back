@@ -3,17 +3,14 @@ services:
     image: postgres:16-alpine
     container_name: similaris-db
     environment:
-      POSTGRES_USER: similaris
-      POSTGRES_PASSWORD: similaris
-      POSTGRES_DB: similaris
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:?Configure POSTGRES_USER no arquivo .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD no arquivo .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Configure POSTGRES_DB no arquivo .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      # executa as migrations na primeira inicialização do banco
       - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U similaris -d similaris"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,8 +19,9 @@ services:
     build: .
     container_name: similaris-api
     environment:
-      DATABASE_URL: postgresql+psycopg2://similaris:similaris@db:5432/similaris
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-similaris-dev-secret-troque-em-producao}
+      DATABASE_URL: ${DATABASE_URL:?Configure DATABASE_URL no arquivo .env}
+      REDIS_URL: ${REDIS_URL:?Configure REDIS_URL no arquivo .env}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Configure JWT_SECRET_KEY no arquivo .env}
       JWT_ACCESS_TOKEN_EXPIRES_IN: ${JWT_ACCESS_TOKEN_EXPIRES_IN:-480}
       JWT_REFRESH_TOKEN_EXPIRES_IN: ${JWT_REFRESH_TOKEN_EXPIRES_IN:-10080}
       CORS_ORIGINS: '["http://localhost:5173","http://localhost:5174"]'
@@ -32,13 +30,23 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
-  # redis: descomentar na fase de processamento em lote (Celery)
-  # redis:
-  #   image: redis:7-alpine
-  #   container_name: similaris-redis
-  #   ports:
-  #     - "6379:6379"
+  redis:
+    image: redis:7-alpine
+    container_name: similaris-redis
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Configure REDIS_PASSWORD no arquivo .env}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   pgdata:
+  redisdata:
