@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 
 
 class AnalysisResult(Base):
-    """Comparação suspeita entre um segmento enviado e um de referência."""
 
     __tablename__ = "analysis_results"
     __table_args__ = (

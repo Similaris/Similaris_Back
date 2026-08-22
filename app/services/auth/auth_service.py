@@ -15,7 +15,6 @@ from app.schemas.auth import UserLogin, UserRegister
 
 
 class AuthService:
-    """Authentication business rules."""
 
     def __init__(self, db: Session):
         self.users = UserRepository(db)

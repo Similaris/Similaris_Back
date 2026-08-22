@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 
 class User(Base):
-    """Conta de acesso ao sistema."""
 
     __tablename__ = "users"
     __table_args__ = (Index("ix_users_email", "email"),)

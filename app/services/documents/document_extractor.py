@@ -6,7 +6,6 @@ from app.services.documents.pdf_extractor import extract_pdf_text
 
 
 def extract_document_text(content: bytes, filename: str) -> str:
-    """Select the appropriate extractor from the document filename."""
     extension = Path(filename).suffix.lower()
 
     if extension == ".pdf":

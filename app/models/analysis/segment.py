@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 
 class Segment(Base):
-    """Trecho segmentado de um documento enviado."""
 
     __tablename__ = "segments"
     __table_args__ = (

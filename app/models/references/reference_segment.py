@@ -13,7 +13,6 @@ if TYPE_CHECKING:
 
 
 class ReferenceSegment(Base):
-    """Trecho pré-processado da base de referência."""
 
     __tablename__ = "reference_segments"
     __table_args__ = (

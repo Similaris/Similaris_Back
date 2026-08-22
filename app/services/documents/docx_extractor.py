@@ -11,7 +11,6 @@ from app.services.documents.exceptions import (
 
 
 def extract_docx_text(content: bytes) -> str:
-    """Extract DOCX paragraphs while preserving their original order."""
     if not content:
         raise EmptyDocumentError("O arquivo DOCX está vazio.")
 
