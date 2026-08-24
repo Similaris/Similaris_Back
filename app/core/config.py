@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:5174"]
     database_url: str
     redis_url: str
+    segment_max_words: int = Field(default=150, ge=1)
 
     secret_key: str = Field(
         validation_alias=AliasChoices("JWT_SECRET_KEY", "SECRET_KEY"),

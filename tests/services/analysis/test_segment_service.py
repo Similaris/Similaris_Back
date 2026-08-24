@@ -4,6 +4,15 @@ from app.models.analysis import Document
 from app.services.analysis.segment_service import SegmentService, segment_text
 
 
+class FakeRepository:
+    def __init__(self):
+        self.segments = None
+
+    def replace_for_document(self, document_id, segments):
+        self.segments = list(segments)
+        return self.segments
+
+
 def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
@@ -63,14 +72,6 @@ def test_segment_text_does_not_lose_words_with_multiple_segments():
 
 
 def test_persist_document_segments_replaces_previous_segments():
-    class FakeRepository:
-        def __init__(self):
-            self.segments = None
-
-        def replace_for_document(self, document_id, segments):
-            self.segments = list(segments)
-            return self.segments
-
     repository = FakeRepository()
     service = SegmentService(db=None, repository=repository)
     document = Document(id=12)
@@ -81,3 +82,23 @@ def test_persist_document_segments_replaces_previous_segments():
     assert [segment.position for segment in result] == [1]
     assert result[0].document_id == 12
     assert result[0].text_original == "A. B."
+
+
+def test_persist_document_segments_preserves_original_text_and_offsets():
+    repository = FakeRepository()
+    service = SegmentService(db=None, repository=repository, max_words=2)
+    document = Document(id=12)
+    original_text = "  Primeira   frase.\n\nSegunda frase?  "
+
+    result = service.persist_document_segments(document, original_text)
+
+    assert [segment.position for segment in result] == [1, 2]
+    assert [segment.text_original for segment in result] == [
+        "Primeira   frase.",
+        "Segunda frase?",
+    ]
+    for segment in result:
+        assert (
+            original_text[segment.start_offset : segment.end_offset]
+            == segment.text_original
+        )
