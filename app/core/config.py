@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     database_url: str
     redis_url: str
     segment_max_words: int = Field(default=150, ge=1)
+    lexical_cosine_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    lexical_jaccard_threshold: float = Field(default=0.2, ge=0.0, le=1.0)
 
     secret_key: str = Field(
         validation_alias=AliasChoices("JWT_SECRET_KEY", "SECRET_KEY"),

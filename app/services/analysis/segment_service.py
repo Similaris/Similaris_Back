@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.analysis import Document, Segment
 from app.repositories.analysis import SegmentRepository
+from app.services.analysis.text_preprocessing import preprocess_text
 from app.services.documents.document_extractor import extract_document_text
 
 
@@ -134,6 +135,7 @@ class SegmentService:
                     start_offset=segment_slice.start_offset,
                     end_offset=segment_slice.end_offset,
                     text_original=segment_slice.text,
+                    text_clean=preprocess_text(segment_slice.text),
                 )
             )
 
