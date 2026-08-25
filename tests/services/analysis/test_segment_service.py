@@ -82,6 +82,7 @@ def test_persist_document_segments_replaces_previous_segments():
     assert [segment.position for segment in result] == [1]
     assert result[0].document_id == 12
     assert result[0].text_original == "A. B."
+    assert result[0].text_clean == "b"
 
 
 def test_persist_document_segments_preserves_original_text_and_offsets():

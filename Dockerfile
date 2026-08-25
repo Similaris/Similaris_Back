@@ -5,7 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Corpus de stopwords em portugues usado pelo pre-processamento lexical
+# Corpus de stopwords em ingles usado pelo pre-processamento lexical
 RUN python -m nltk.downloader -d /usr/local/share/nltk_data stopwords
 
 COPY app ./app
