@@ -24,12 +24,16 @@ services:
       SEGMENT_MAX_WORDS: ${SEGMENT_MAX_WORDS:-150}
       LEXICAL_COSINE_THRESHOLD: ${LEXICAL_COSINE_THRESHOLD:-0.5}
       LEXICAL_JACCARD_THRESHOLD: ${LEXICAL_JACCARD_THRESHOLD:-0.2}
+      UPLOAD_DIR: ${UPLOAD_DIR:-uploads}
+      UPLOAD_MAX_FILE_SIZE_MB: ${UPLOAD_MAX_FILE_SIZE_MB:-20}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Configure JWT_SECRET_KEY no arquivo .env}
       JWT_ACCESS_TOKEN_EXPIRES_IN: ${JWT_ACCESS_TOKEN_EXPIRES_IN:-480}
       JWT_REFRESH_TOKEN_EXPIRES_IN: ${JWT_REFRESH_TOKEN_EXPIRES_IN:-10080}
       CORS_ORIGINS: '["http://localhost:5173","http://localhost:5174"]'
     ports:
       - "8000:8000"
+    volumes:
+      - uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -53,3 +57,4 @@ services:
 volumes:
   pgdata:
   redisdata:
+  uploads:
