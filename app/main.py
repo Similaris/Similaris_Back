@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import app.models  # noqa: F401  (registra os modelos no metadata)
 from app.api.auth import router as auth_router
+from app.api.documents import router as documents_router
 from app.api.health import router as health_router
 from app.core.config import settings
 from app.core.database import Base, engine
@@ -28,3 +29,4 @@ app.add_middleware(
 
 app.include_router(health_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
+app.include_router(documents_router, prefix="/api")
