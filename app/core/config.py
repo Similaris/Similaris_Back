@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     segment_max_words: int = Field(default=150, ge=1)
     lexical_cosine_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     lexical_jaccard_threshold: float = Field(default=0.2, ge=0.0, le=1.0)
+    upload_dir: str = "uploads"
+    upload_max_file_size_mb: int = Field(default=20, ge=1)
 
     secret_key: str = Field(
         validation_alias=AliasChoices("JWT_SECRET_KEY", "SECRET_KEY"),
