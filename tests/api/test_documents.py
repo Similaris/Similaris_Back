@@ -12,6 +12,8 @@ from app.core.config import settings
 from app.core.database import Base, get_db
 from app.main import app
 from app.models.auth import User
+from app.services.documents import upload_service
+from app.services.documents.document_processing import DocumentProcessingService
 
 
 def build_docx(*paragraphs: str) -> bytes:
@@ -42,6 +44,13 @@ def client(tmp_path, monkeypatch):
     session.commit()
     session.refresh(user)
 
+    # O upload publica tarefas Celery; nos testes registramos os IDs para
+    # simular os workers depois, sem depender de um broker real.
+    dispatched: list[int] = []
+    monkeypatch.setattr(
+        upload_service, "dispatch_document_processing", dispatched.append
+    )
+
     def override_get_db():
         db = TestingSessionLocal()
         try:
@@ -53,10 +62,23 @@ def client(tmp_path, monkeypatch):
     app.dependency_overrides[get_current_user] = lambda: user
 
     with TestClient(app) as test_client:
+        test_client.dispatched = dispatched
+        test_client.session_factory = TestingSessionLocal
         yield test_client
 
     app.dependency_overrides.clear()
     session.close()
+
+
+def run_pending_workers(client) -> None:
+    """Simula os workers Celery processando as tarefas enfileiradas."""
+    while client.dispatched:
+        document_id = client.dispatched.pop(0)
+        db = client.session_factory()
+        try:
+            DocumentProcessingService(db).process_document(document_id)
+        finally:
+            db.close()
 
 
 def test_upload_requires_authentication(client):
@@ -70,7 +92,7 @@ def test_upload_requires_authentication(client):
     assert response.status_code == 403
 
 
-def test_upload_creates_batch_documents_and_segments(client):
+def test_upload_creates_pending_batch_and_dispatches_processing(client):
     content = build_docx("The student wrote an original academic paper.")
 
     response = client.post(
@@ -87,16 +109,35 @@ def test_upload_creates_batch_documents_and_segments(client):
     assert document["filename"] == "paper.docx"
     assert document["file_type"] == "docx"
     assert document["status"] == "pendente"
-    assert document["segment_count"] > 0
+    assert "segment_count" not in document
+    assert client.dispatched == [document["id"]]
+
+    segments_response = client.get(f"/api/documents/{document['id']}/segments")
+    assert segments_response.status_code == 200
+    assert segments_response.json() == []
+
+
+def test_upload_then_worker_processing_generates_segments(client):
+    content = build_docx("The student wrote an original academic paper.")
+
+    response = client.post(
+        "/api/documents/upload",
+        files=[("files", ("paper.docx", content, "application/octet-stream"))],
+    )
+    document = response.json()["documents"][0]
+
+    run_pending_workers(client)
 
     list_response = client.get("/api/documents")
     assert list_response.status_code == 200
-    assert [item["id"] for item in list_response.json()] == [document["id"]]
+    listed = list_response.json()
+    assert [item["id"] for item in listed] == [document["id"]]
+    assert listed[0]["status"] == "concluido"
 
     segments_response = client.get(f"/api/documents/{document['id']}/segments")
     assert segments_response.status_code == 200
     segments = segments_response.json()
-    assert len(segments) == document["segment_count"]
+    assert len(segments) > 0
     assert segments[0]["text_original"]
     assert segments[0]["text_clean"]
 
@@ -109,6 +150,7 @@ def test_upload_rejects_unsupported_extension(client):
 
     assert response.status_code == 415
     assert "não suportado" in response.json()["detail"]
+    assert client.dispatched == []
 
 
 def test_upload_rejects_file_above_size_limit(client, monkeypatch):
@@ -122,6 +164,7 @@ def test_upload_rejects_file_above_size_limit(client, monkeypatch):
 
     assert response.status_code == 413
     assert "excede o limite" in response.json()["detail"]
+    assert client.dispatched == []
 
 
 def test_list_segments_of_unknown_document_returns_404(client):

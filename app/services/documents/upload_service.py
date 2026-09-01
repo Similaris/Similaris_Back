@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Callable
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.analysis import Batch, Document
 from app.repositories.analysis import BatchRepository, DocumentRepository
-from app.services.documents.document_extractor import extract_document_text
 from app.services.documents.exceptions import (
-    DocumentExtractionError,
     EmptyUploadError,
     FileTooLargeError,
     UnsupportedDocumentTypeError,
@@ -22,10 +19,15 @@ from app.services.documents.file_storage import (
     store_document_file,
 )
 
-if TYPE_CHECKING:
-    from app.services.analysis.segment_service import SegmentService
-
 SUPPORTED_UPLOAD_EXTENSIONS = {".pdf", ".docx"}
+
+
+def dispatch_document_processing(document_id: int) -> None:
+    """Enfileira o processamento do documento nos workers Celery."""
+    # Import tardio para evitar ciclo: a task importa serviços deste pacote.
+    from app.tasks.document_tasks import process_document
+
+    process_document.delay(document_id)
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,55 +39,47 @@ class UploadFilePayload:
 
 
 @dataclass(frozen=True, slots=True)
-class UploadedDocument:
-    """Documento criado no upload com a contagem de segmentos gerados."""
-
-    document: Document
-    segment_count: int
-
-
-@dataclass(frozen=True, slots=True)
 class UploadResult:
     batch: Batch
-    documents: list[UploadedDocument]
+    documents: list[Document]
 
 
 class UploadService:
-    """Orquestra o fluxo de upload: validação, armazenamento e segmentação."""
+    """Orquestra o upload: validação, armazenamento e enfileiramento.
+
+    O processamento pesado (extração e segmentação) acontece de forma
+    assíncrona nos workers Celery — o upload apenas registra o lote e os
+    documentos com status ``pendente`` e publica uma tarefa por documento.
+    """
 
     def __init__(
         self,
         db: Session,
         batch_repository: BatchRepository | None = None,
         document_repository: DocumentRepository | None = None,
-        segment_service: SegmentService | None = None,
+        dispatch_document: Callable[[int], None] | None = None,
     ):
         self.batch_repository = batch_repository or BatchRepository(db)
         self.document_repository = document_repository or DocumentRepository(db)
-        if segment_service is None:
-            # Import tardio para evitar ciclo com app.services.analysis
-            from app.services.analysis.segment_service import SegmentService
-
-            segment_service = SegmentService(db)
-        self.segment_service = segment_service
+        self.dispatch_document = dispatch_document or dispatch_document_processing
 
     def upload_documents(
         self, user_id: int, files: list[UploadFilePayload]
     ) -> UploadResult:
-        """Valida os arquivos, cria o lote e processa cada documento.
+        """Valida os arquivos, cria o lote e enfileira o processamento.
 
         A validação é feita antes de qualquer persistência: se algum
-        arquivo for inválido, nada é criado. Falhas de extração não
-        interrompem o lote — o documento é marcado com status ``erro``
-        e os demais seguem o fluxo normalmente.
+        arquivo for inválido, nada é criado. As tarefas só são publicadas
+        depois que todos os documentos do lote existem no banco, para que
+        a finalização do lote nos workers enxergue o conjunto completo.
         """
         self._validate_files(files)
 
         batch = self.batch_repository.create_for_user(user_id)
-        documents: list[UploadedDocument] = []
+        documents = [self._store_file(batch, payload) for payload in files]
 
-        for payload in files:
-            documents.append(self._process_file(batch, payload))
+        for document in documents:
+            self.dispatch_document(document.id)
 
         return UploadResult(batch=batch, documents=documents)
 
@@ -109,11 +103,9 @@ class UploadService:
                     f"{settings.upload_max_file_size_mb} MB."
                 )
 
-    def _process_file(
-        self, batch: Batch, payload: UploadFilePayload
-    ) -> UploadedDocument:
+    def _store_file(self, batch: Batch, payload: UploadFilePayload) -> Document:
         file_path = store_document_file(payload.content, payload.filename, batch.id)
-        document = self.document_repository.create(
+        return self.document_repository.create(
             Document(
                 batch_id=batch.id,
                 filename=payload.filename,
@@ -123,19 +115,3 @@ class UploadService:
                 status="pendente",
             )
         )
-
-        started = time.perf_counter()
-        try:
-            extracted_text = extract_document_text(payload.content, payload.filename)
-        except DocumentExtractionError as error:
-            document.status = "erro"
-            document.error_message = str(error)
-            self.document_repository.save(document)
-            return UploadedDocument(document=document, segment_count=0)
-
-        document.extraction_ms = int((time.perf_counter() - started) * 1000)
-        segments = self.segment_service.persist_document_segments(
-            document, extracted_text
-        )
-        self.document_repository.save(document)
-        return UploadedDocument(document=document, segment_count=len(segments))

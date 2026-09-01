@@ -15,7 +15,6 @@ from app.services.documents.upload_service import (
     UploadFilePayload,
     UploadResult,
     UploadService,
-    UploadedDocument,
 )
 
 __all__ = [
@@ -30,7 +29,6 @@ __all__ = [
     "UploadResult",
     "UploadService",
     "UploadValidationError",
-    "UploadedDocument",
     "extract_document_text",
     "extract_docx_text",
     "extract_pdf_text",
