@@ -15,6 +15,11 @@ class BatchRepository:
         self.db.refresh(batch)
         return batch
 
+    def save(self, batch: Batch) -> Batch:
+        self.db.commit()
+        self.db.refresh(batch)
+        return batch
+
     def get_by_id_for_user(self, batch_id: int, user_id: int) -> Batch | None:
         return (
             self.db.query(Batch)

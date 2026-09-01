@@ -19,6 +19,17 @@ class DocumentRepository:
         self.db.refresh(document)
         return document
 
+    def get_by_id(self, document_id: int) -> Document | None:
+        return self.db.get(Document, document_id)
+
+    def list_by_batch(self, batch_id: int) -> list[Document]:
+        return (
+            self.db.query(Document)
+            .filter(Document.batch_id == batch_id)
+            .order_by(Document.id)
+            .all()
+        )
+
     def list_for_user(self, user_id: int) -> list[Document]:
         return (
             self.db.query(Document)
