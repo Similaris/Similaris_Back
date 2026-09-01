@@ -15,16 +15,12 @@ class DocumentOut(BaseModel):
     created_at: datetime
 
 
-class DocumentUploadOut(DocumentOut):
-    segment_count: int = 0
-
-
 class BatchUploadOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     batch_id: int
     status: str
-    documents: list[DocumentUploadOut]
+    documents: list[DocumentOut]
 
 
 class SegmentOut(BaseModel):

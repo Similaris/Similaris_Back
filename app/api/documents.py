@@ -8,7 +8,6 @@ from app.repositories.analysis import DocumentRepository, SegmentRepository
 from app.schemas.analysis import (
     BatchUploadOut,
     DocumentOut,
-    DocumentUploadOut,
     SegmentOut,
 )
 from app.services.documents import (
@@ -28,7 +27,7 @@ async def upload_documents(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Recebe PDF/DOCX, cria o lote e segmenta cada documento."""
+    """Recebe PDF/DOCX, cria o lote e enfileira o processamento."""
     payloads = [
         UploadFilePayload(filename=file.filename or "", content=await file.read())
         for file in files
@@ -47,11 +46,7 @@ async def upload_documents(
         batch_id=result.batch.id,
         status=result.batch.status,
         documents=[
-            DocumentUploadOut(
-                **DocumentOut.model_validate(uploaded.document).model_dump(),
-                segment_count=uploaded.segment_count,
-            )
-            for uploaded in result.documents
+            DocumentOut.model_validate(document) for document in result.documents
         ],
     )
 
