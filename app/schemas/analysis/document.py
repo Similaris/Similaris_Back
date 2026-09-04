@@ -12,7 +12,10 @@ class DocumentOut(BaseModel):
     file_type: str
     status: str
     error_message: str | None = None
+    extraction_ms: int | None = None
     created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
 
 class BatchUploadOut(BaseModel):
