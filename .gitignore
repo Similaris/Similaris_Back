@@ -13,6 +13,8 @@ __pycache__/
 
 # Dados, corpora, modelos e uploads
 data/
+*.rar
+*.r[0-9][0-9]
 /models/
 uploads/
 *.pt

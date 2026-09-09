@@ -25,6 +25,8 @@ class ReferenceSegment(Base):
         ForeignKey("reference_docs.id", ondelete="CASCADE"), nullable=False
     )
     position: Mapped[int] = mapped_column(nullable=False)
+    start_offset: Mapped[int | None] = mapped_column()
+    end_offset: Mapped[int | None] = mapped_column()
     text_original: Mapped[str] = mapped_column(Text, nullable=False)
     text_clean: Mapped[str | None] = mapped_column(Text)
 

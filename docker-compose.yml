@@ -24,6 +24,9 @@ services:
       SEGMENT_MAX_WORDS: ${SEGMENT_MAX_WORDS:-150}
       LEXICAL_COSINE_THRESHOLD: ${LEXICAL_COSINE_THRESHOLD:-0.5}
       LEXICAL_JACCARD_THRESHOLD: ${LEXICAL_JACCARD_THRESHOLD:-0.2}
+      SEMANTIC_MODEL_NAME: ${SEMANTIC_MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
+      REFERENCE_INDEX_DIR: ${REFERENCE_INDEX_DIR:-data/reference-index}
+      HF_HOME: /app/data/huggingface
       UPLOAD_DIR: ${UPLOAD_DIR:-uploads}
       UPLOAD_MAX_FILE_SIZE_MB: ${UPLOAD_MAX_FILE_SIZE_MB:-20}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Configure JWT_SECRET_KEY no arquivo .env}
@@ -34,6 +37,7 @@ services:
       - "8000:8000"
     volumes:
       - uploads:/app/uploads
+      - ./data:/app/data
     depends_on:
       db:
         condition: service_healthy
@@ -72,11 +76,15 @@ services:
       SEGMENT_MAX_WORDS: ${SEGMENT_MAX_WORDS:-150}
       LEXICAL_COSINE_THRESHOLD: ${LEXICAL_COSINE_THRESHOLD:-0.5}
       LEXICAL_JACCARD_THRESHOLD: ${LEXICAL_JACCARD_THRESHOLD:-0.2}
+      SEMANTIC_MODEL_NAME: ${SEMANTIC_MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
+      REFERENCE_INDEX_DIR: ${REFERENCE_INDEX_DIR:-data/reference-index}
+      HF_HOME: /app/data/huggingface
       UPLOAD_DIR: ${UPLOAD_DIR:-uploads}
       UPLOAD_MAX_FILE_SIZE_MB: ${UPLOAD_MAX_FILE_SIZE_MB:-20}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Configure JWT_SECRET_KEY no arquivo .env}
     volumes:
       - uploads:/app/uploads
+      - ./data:/app/data
     depends_on:
       db:
         condition: service_healthy

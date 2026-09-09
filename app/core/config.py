@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     lexical_cosine_threshold: float = Field(default=0.5, ge=0.0, le=1.0)
     lexical_jaccard_threshold: float = Field(default=0.2, ge=0.0, le=1.0)
     semantic_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    reference_index_dir: str = "data/reference-index"
     upload_dir: str = "uploads"
     upload_max_file_size_mb: int = Field(default=20, ge=1)
 
