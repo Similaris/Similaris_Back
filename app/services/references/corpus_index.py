@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import version
 from itertools import islice
@@ -16,6 +17,7 @@ from scipy import sparse
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from app.core.config import settings
+from app.models.references import ReferenceSegment
 from app.repositories.references import ReferenceRepository
 
 ARTIFACTS = (
@@ -25,6 +27,7 @@ ARTIFACTS = (
     "idf.npy",
     "semantic.npy",
 )
+VALIDATION_BATCH_SIZE = 1024
 
 
 class CorpusIndexError(ValueError):
@@ -61,38 +64,62 @@ def _write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
 
 
+def _read_json(path: Path) -> object:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise CorpusIndexError(
+            f"Indice ausente ou ilegivel ({path.name}): {error}"
+        ) from error
+
+
 def _file_hash(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def reference_fingerprint(repository: ReferenceRepository) -> tuple[str, int, int]:
+def _segment_record(segment: ReferenceSegment) -> bytes:
+    document = segment.reference_document
+    if (
+        not document.content_sha256
+        or not document.import_signature
+        or segment.text_clean is None
+        or segment.start_offset is None
+        or segment.end_offset is None
+        or segment.start_offset < 0
+        or segment.end_offset - segment.start_offset != len(segment.text_original)
+    ):
+        raise CorpusIndexError(
+            f"Referencia {document.corpus_id} sem preparacao completa."
+        )
+    record = (
+        segment.id, document.id, document.corpus_id,
+        document.content_sha256, document.import_signature,
+        segment.position, segment.start_offset, segment.end_offset,
+        segment.text_original, segment.text_clean,
+    )
+    return json.dumps(record, ensure_ascii=True).encode("utf-8")
+
+
+def reference_segment_signature(segment: ReferenceSegment) -> bytes:
+    return hashlib.sha256(_segment_record(segment)).digest()
+
+
+def reference_fingerprint(
+    repository: ReferenceRepository,
+    *,
+    on_segment: Callable[[int, bytes], None] | None = None,
+) -> tuple[str, int, int]:
     digest = hashlib.sha256()
     count = 0
     documents: set[int] = set()
     for segment in repository.iter_segments():
-        document = segment.reference_document
-        if (
-            not document.content_sha256
-            or not document.import_signature
-            or segment.text_clean is None
-            or segment.start_offset is None
-            or segment.end_offset is None
-            or segment.start_offset < 0
-            or segment.end_offset - segment.start_offset != len(segment.text_original)
-        ):
-            raise CorpusIndexError(
-                f"Referencia {document.corpus_id} sem preparacao completa."
-            )
-        record = (
-            segment.id, document.id, document.corpus_id,
-            document.content_sha256, document.import_signature,
-            segment.position, segment.start_offset, segment.end_offset,
-            segment.text_original, segment.text_clean,
-        )
-        digest.update(json.dumps(record, ensure_ascii=True).encode("utf-8"))
+        record = _segment_record(segment)
+        digest.update(record)
         digest.update(b"\n")
-        documents.add(document.id)
+        if on_segment is not None:
+            on_segment(segment.id, hashlib.sha256(record).digest())
+        documents.add(segment.reference_doc_id)
         count += 1
     if count == 0:
         raise CorpusIndexError("Importe documentos fonte em ingles antes de indexar.")
@@ -100,7 +127,7 @@ def reference_fingerprint(repository: ReferenceRepository) -> tuple[str, int, in
 
 
 def _current_generation(directory: Path) -> Path:
-    pointer = json.loads((directory / "current.json").read_text(encoding="utf-8"))
+    pointer = _read_json(directory / "current.json")
     if not isinstance(pointer, dict):
         raise CorpusIndexError("Ponteiro do indice invalido.")
     generation = pointer.get("generation")
@@ -110,7 +137,7 @@ def _current_generation(directory: Path) -> Path:
 
 
 def _manifest(generation: Path) -> dict:
-    value = json.loads((generation / "manifest.json").read_text(encoding="utf-8"))
+    value = _read_json(generation / "manifest.json")
     if not isinstance(value, dict):
         raise CorpusIndexError("Manifesto do indice invalido.")
     return value
@@ -124,6 +151,38 @@ def _verify_artifacts(generation: Path, manifest: dict) -> None:
         path = generation / filename
         if not path.is_file() or _file_hash(path) != hashes[filename]:
             raise CorpusIndexError(f"Artefato ausente ou corrompido: {filename}.")
+
+
+def _validate_vectors(lexical: sparse.csr_matrix, semantic: NDArray[np.float32]) -> None:
+    try:
+        lexical.check_format(full_check=True)
+    except ValueError as error:
+        raise CorpusIndexError("Estrutura da matriz lexical invalida.") from error
+    if not np.issubdtype(lexical.dtype, np.floating):
+        raise CorpusIndexError("Tipo da matriz lexical invalido.")
+
+    for start in range(0, lexical.shape[0], VALIDATION_BATCH_SIZE):
+        end = start + VALIDATION_BATCH_SIZE
+        lexical_batch = lexical[start:end].astype(np.float64)
+        if (
+            not np.all(np.isfinite(lexical_batch.data))
+            or np.any(lexical_batch.data < 0)
+        ):
+            raise CorpusIndexError("Vetores lexicais invalidos.")
+        lexical_norms = np.sqrt(
+            np.asarray(lexical_batch.multiply(lexical_batch).sum(axis=1)).ravel()
+        )
+        if not np.all(
+            (lexical_norms == 0) | np.isclose(lexical_norms, 1.0, rtol=0, atol=1e-4)
+        ):
+            raise CorpusIndexError("Vetores lexicais nao normalizados.")
+
+        semantic_batch = semantic[start:end]
+        if not np.all(np.isfinite(semantic_batch)):
+            raise CorpusIndexError("Embeddings do indice invalidos.")
+        semantic_norms = np.linalg.norm(semantic_batch.astype(np.float64), axis=1)
+        if not np.all(np.isclose(semantic_norms, 1.0, rtol=0, atol=1e-4)):
+            raise CorpusIndexError("Embeddings do indice nao normalizados.")
 
 
 def load_corpus_index(
@@ -143,7 +202,7 @@ def load_corpus_index(
     ids = np.load(generation / "segment_ids.npy", allow_pickle=False)
     lexical = sparse.load_npz(generation / "lexical.npz").tocsr()
     semantic = np.load(generation / "semantic.npy", allow_pickle=False, mmap_mode="r")
-    vocabulary = json.loads((generation / "vocabulary.json").read_text(encoding="utf-8"))
+    vocabulary = _read_json(generation / "vocabulary.json")
     idf = np.load(generation / "idf.npy", allow_pickle=False)
     if (
         not isinstance(vocabulary, dict) or not vocabulary
@@ -163,6 +222,7 @@ def load_corpus_index(
         or lexical.shape != (rows, len(vocabulary))
         or idf.shape != (len(vocabulary),)
         or not np.all(np.isfinite(idf))
+        or np.any(idf <= 0)
         or len(set(ids.tolist())) != rows or np.any(ids < 1)
     ):
         raise CorpusIndexError("Dimensoes ou identificadores do indice invalidos.")
@@ -172,6 +232,7 @@ def load_corpus_index(
     fingerprint = manifest.get("fingerprint")
     if not isinstance(fingerprint, str) or not re.fullmatch(r"[0-9a-f]{64}", fingerprint):
         raise CorpusIndexError("Identidade do indice invalida.")
+    _validate_vectors(lexical, semantic)
     return CorpusIndex(ids, lexical, semantic, vectorizer, fingerprint)
 
 

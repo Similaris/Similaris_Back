@@ -2,6 +2,7 @@ from app.core.config import settings
 from app.services.analysis.lexical_similarity import (
     compare_texts,
     compute_cosine_similarity,
+    compute_jaccard_from_tokens,
     compute_jaccard_similarity,
 )
 
@@ -113,3 +114,16 @@ def test_compute_jaccard_similarity_uses_token_sets():
     )
 
     assert score == 1.0
+
+
+def test_prepared_jaccard_keeps_precision_while_text_helper_remains_compatible():
+    raw = compute_jaccard_from_tokens(
+        frozenset({"copied"}), frozenset({"copied", "source", "text"})
+    )
+    assert raw == 1 / 3
+    assert compute_jaccard_similarity("copied", "copied source text") == 0.3333
+
+
+def test_prepared_jaccard_handles_empty_token_sets():
+    assert compute_jaccard_from_tokens(set(), {"text"}) == 0.0
+    assert compute_jaccard_from_tokens({"text"}, set()) == 0.0

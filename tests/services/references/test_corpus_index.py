@@ -3,6 +3,7 @@ import json
 
 import numpy as np
 import pytest
+from scipy import sparse
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,7 @@ from app.services.references.corpus_index import (
     load_corpus_index,
     prepare_corpus_index,
     reference_fingerprint,
+    reference_segment_signature,
 )
 
 
@@ -180,3 +182,71 @@ def test_invalid_generation_path_is_rejected(tmp_path):
 def test_batch_size_must_be_positive(repository, tmp_path):
     with pytest.raises(ValueError, match="batch_size"):
         prepare_corpus_index(repository, tmp_path, batch_size=0)
+
+
+def test_fingerprint_can_capture_signatures_without_changing_existing_identity(repository):
+    previous = reference_fingerprint(repository)
+    signatures = {}
+    captured = reference_fingerprint(repository, on_segment=signatures.__setitem__)
+
+    assert captured == previous
+    assert signatures == {
+        segment.id: reference_segment_signature(segment)
+        for segment in repository.iter_segments()
+    }
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), 0.0, 2.0])
+def test_invalid_semantic_vectors_are_rejected_even_with_matching_hashes(
+    repository, tmp_path, encoded_batches, refresh_artifact_hash, value,
+):
+    preparation = prepare_corpus_index(repository, tmp_path)
+    filename = "semantic.npy"
+    vectors = np.load(preparation.directory / filename)
+    vectors[0] = value
+    np.save(preparation.directory / filename, vectors, allow_pickle=False)
+    refresh_artifact_hash(preparation.directory, filename)
+
+    with pytest.raises(CorpusIndexError, match="Embeddings"):
+        load_corpus_index(tmp_path)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -0.1, 2.0])
+def test_invalid_lexical_vectors_are_rejected_even_with_matching_hashes(
+    repository, tmp_path, encoded_batches, refresh_artifact_hash, value,
+):
+    preparation = prepare_corpus_index(repository, tmp_path)
+    filename = "lexical.npz"
+    matrix = sparse.load_npz(preparation.directory / filename).tocsr()
+    matrix.data[0] = value
+    sparse.save_npz(preparation.directory / filename, matrix)
+    refresh_artifact_hash(preparation.directory, filename)
+
+    with pytest.raises(CorpusIndexError, match="lexicais"):
+        load_corpus_index(tmp_path)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), 0.0, -0.1])
+def test_invalid_idf_values_are_rejected(
+    repository, tmp_path, encoded_batches, refresh_artifact_hash, value,
+):
+    preparation = prepare_corpus_index(repository, tmp_path)
+    filename = "idf.npy"
+    idf = np.load(preparation.directory / filename)
+    idf[0] = value
+    np.save(preparation.directory / filename, idf, allow_pickle=False)
+    refresh_artifact_hash(preparation.directory, filename)
+
+    with pytest.raises(CorpusIndexError, match="invalidos"):
+        load_corpus_index(tmp_path)
+
+
+def test_malformed_pointer_reports_the_file(tmp_path):
+    (tmp_path / "current.json").write_text("{invalid", encoding="utf-8")
+    with pytest.raises(CorpusIndexError, match="current.json"):
+        load_corpus_index(tmp_path)
+
+
+def test_missing_pointer_reports_the_file(tmp_path):
+    with pytest.raises(CorpusIndexError, match="current.json"):
+        load_corpus_index(tmp_path)

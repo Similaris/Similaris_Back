@@ -38,7 +38,7 @@ class ReferenceRepository:
         statement = (
             self._segments_statement(source, language)
             .order_by(ReferenceDocument.corpus_id, ReferenceSegment.position)
-            .execution_options(yield_per=REFERENCE_BATCH_SIZE)
+            .execution_options(yield_per=REFERENCE_BATCH_SIZE, populate_existing=True)
         )
         yield from self.db.scalars(statement)
 
