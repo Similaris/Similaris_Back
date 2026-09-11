@@ -99,21 +99,11 @@ class ReferenceSearchService:
             raise TypeError("text_original deve ser uma string.")
         if not text_original.strip():
             raise ValueError("text_original nao pode ser vazio.")
-        options = ReferenceSearchOptions(
-            mode=settings.reference_search_mode if mode is None else mode,
-            top_n=settings.reference_search_top_n if top_n is None else top_n,
-            lexical_cosine_threshold=(
-                settings.lexical_cosine_threshold
-                if lexical_cosine_threshold is None else lexical_cosine_threshold
-            ),
-            lexical_jaccard_threshold=(
-                settings.lexical_jaccard_threshold
-                if lexical_jaccard_threshold is None else lexical_jaccard_threshold
-            ),
-            semantic_threshold=(
-                settings.reference_search_semantic_threshold
-                if semantic_threshold is None else semantic_threshold
-            ),
+        options = ReferenceSearchOptions.from_overrides(
+            mode=mode, top_n=top_n,
+            lexical_cosine_threshold=lexical_cosine_threshold,
+            lexical_jaccard_threshold=lexical_jaccard_threshold,
+            semantic_threshold=semantic_threshold,
         )
         index = self._index
         if index is None:

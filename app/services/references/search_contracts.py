@@ -30,6 +30,33 @@ class ReferenceSearchOptions:
         default_factory=lambda: settings.reference_search_semantic_threshold
     )
 
+    @classmethod
+    def from_overrides(
+        cls,
+        *,
+        mode: SearchMode | None = None,
+        top_n: int | None = None,
+        lexical_cosine_threshold: float | None = None,
+        lexical_jaccard_threshold: float | None = None,
+        semantic_threshold: float | None = None,
+    ) -> ReferenceSearchOptions:
+        return cls(
+            mode=settings.reference_search_mode if mode is None else mode,
+            top_n=settings.reference_search_top_n if top_n is None else top_n,
+            lexical_cosine_threshold=(
+                settings.lexical_cosine_threshold
+                if lexical_cosine_threshold is None else lexical_cosine_threshold
+            ),
+            lexical_jaccard_threshold=(
+                settings.lexical_jaccard_threshold
+                if lexical_jaccard_threshold is None else lexical_jaccard_threshold
+            ),
+            semantic_threshold=(
+                settings.reference_search_semantic_threshold
+                if semantic_threshold is None else semantic_threshold
+            ),
+        )
+
     def __post_init__(self) -> None:
         if not isinstance(self.mode, str):
             raise TypeError("mode deve ser uma string.")

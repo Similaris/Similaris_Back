@@ -30,6 +30,24 @@ def test_search_defaults_follow_current_settings(monkeypatch):
     assert options.lexical_jaccard_threshold == 0.3
 
 
+def test_overrides_share_the_same_defaults_as_direct_options(monkeypatch):
+    monkeypatch.setattr(settings, "reference_search_top_n", 9)
+    assert ReferenceSearchOptions.from_overrides() == ReferenceSearchOptions()
+    options = ReferenceSearchOptions.from_overrides(
+        mode="lexical", top_n=2, semantic_threshold=-1,
+        lexical_cosine_threshold=0, lexical_jaccard_threshold=1,
+    )
+    assert options == ReferenceSearchOptions(
+        mode="lexical", top_n=2, semantic_threshold=-1,
+        lexical_cosine_threshold=0, lexical_jaccard_threshold=1,
+    )
+
+
+def test_invalid_overrides_are_validated():
+    with pytest.raises(TypeError, match="top_n"):
+        ReferenceSearchOptions.from_overrides(top_n=True)
+
+
 @pytest.mark.parametrize("top_n", [True, False, 1.0, "5", None])
 def test_top_n_requires_an_integer(top_n):
     with pytest.raises(TypeError, match="top_n"):

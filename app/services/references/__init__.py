@@ -1,1 +1,1 @@
-"""Preparacao offline da base de referencia."""
+"""Preparacao offline e busca reutilizavel na base de referencia."""
