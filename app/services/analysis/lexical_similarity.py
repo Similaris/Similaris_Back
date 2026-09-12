@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Set
 from dataclasses import dataclass
 
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -50,12 +51,17 @@ def compute_jaccard_similarity(text_a: str, text_b: str) -> float:
     """
     tokens_a = set(preprocess_tokens(text_a))
     tokens_b = set(preprocess_tokens(text_b))
+    return _clamp_score(compute_jaccard_from_tokens(tokens_a, tokens_b))
+
+
+def compute_jaccard_from_tokens(tokens_a: Set[str], tokens_b: Set[str]) -> float:
+    """Compara tokens ja preparados, sem arredondar antes de aplicar filtros."""
     if not tokens_a or not tokens_b:
         return 0.0
 
     intersection = tokens_a & tokens_b
     union = tokens_a | tokens_b
-    return _clamp_score(len(intersection) / len(union))
+    return len(intersection) / len(union)
 
 
 def compare_texts(

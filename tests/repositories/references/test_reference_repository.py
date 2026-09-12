@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -92,3 +92,68 @@ def test_reference_and_segments_rollback_together(db):
 
     assert repository.get_by_corpus_id("pan-pc-11", "source-document00001.txt") is None
     assert list(repository.iter_segments()) == []
+
+
+def test_get_segments_by_ids_returns_only_prepared_scope_with_documents(db):
+    repository = ReferenceRepository(db)
+    with db.begin():
+        first = repository.add(reference("source-document00002.txt"), [segment(2)])
+        second = repository.add(reference("source-document00001.txt"), [segment()])
+        german = repository.add(
+            reference("source-document00003.txt", language="de"), [segment()]
+        )
+        ids = [first.segments[0].id, second.segments[0].id, german.segments[0].id]
+
+    rows = repository.get_segments_by_ids([*reversed(ids), ids[0], 999])
+
+    assert {row.id for row in rows} == set(ids[:2])
+    assert len(rows) == 2
+    assert {row.reference_document.corpus_id for row in rows} == {
+        "source-document00001.txt", "source-document00002.txt",
+    }
+
+
+def test_get_segments_by_ids_batches_queries_without_lazy_document_loads(db):
+    repository = ReferenceRepository(db)
+    with db.begin():
+        document = repository.add(reference(), [segment(), segment(2)])
+        ids = [row.id for row in document.segments]
+    statements = []
+
+    def record(connection, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(db.get_bind(), "before_cursor_execute", record)
+    try:
+        rows = repository.get_segments_by_ids([*ids, *range(1000, 1598)])
+        titles = [row.reference_document.title for row in rows]
+    finally:
+        event.remove(db.get_bind(), "before_cursor_execute", record)
+
+    assert len(statements) == 3
+    assert titles == ["A source", "A source"]
+
+
+def test_get_segments_by_ids_refreshes_existing_session_objects(db):
+    repository = ReferenceRepository(db)
+    with db.begin():
+        document = repository.add(reference(), [segment()])
+        segment_id = document.segments[0].id
+    row = repository.get_segments_by_ids([segment_id])[0]
+    db.execute(
+        update(ReferenceSegment)
+        .where(ReferenceSegment.id == segment_id)
+        .values(text_clean="changed text")
+        .execution_options(synchronize_session=False)
+    )
+    assert row.text_clean == "source text"
+
+    assert repository.get_segments_by_ids([segment_id])[0].text_clean == "changed text"
+
+
+def test_get_segments_by_ids_empty_selection_does_not_query(db, monkeypatch):
+    def fail(*args, **kwargs):
+        raise AssertionError("An empty selection must not query the database.")
+
+    monkeypatch.setattr(db, "scalars", fail)
+    assert ReferenceRepository(db).get_segments_by_ids([]) == []

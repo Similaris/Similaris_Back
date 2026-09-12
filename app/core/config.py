@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings
 
@@ -15,6 +17,9 @@ class Settings(BaseSettings):
     lexical_jaccard_threshold: float = Field(default=0.2, ge=0.0, le=1.0)
     semantic_model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
     reference_index_dir: str = "data/reference-index"
+    reference_search_mode: Literal["semantic", "lexical"] = "semantic"
+    reference_search_top_n: int = Field(default=5, ge=1)
+    reference_search_semantic_threshold: float = Field(default=0.5, ge=-1.0, le=1.0)
     upload_dir: str = "uploads"
     upload_max_file_size_mb: int = Field(default=20, ge=1)
 

@@ -183,8 +183,8 @@ muitos segmentos, e a etapa SBERT é a mais custosa.
   possam estar associadas a resultados antigos.
 - TF-IDF é ajustado sobre a base inteira selecionada. São salvos a matriz
   esparsa, vocabulário e IDF, além dos embeddings normalizados e IDs dos segmentos
-  na mesma ordem de linhas. As futuras consultas devem usar esse vocabulário/IDF,
-  não reajustar TF-IDF para cada par.
+  na mesma ordem de linhas. A busca reutiliza esse vocabulário/IDF, sem
+  reajustar TF-IDF para cada par.
 - SBERT reutiliza `generate_embeddings()` existente, em lotes limitados.
   Os embeddings são gravados progressivamente e podem ser carregados com
   mapeamento de memória, sem carregar a matriz inteira na RAM.
@@ -216,8 +216,178 @@ não inicia dependências; PostgreSQL deve estar disponível.
 
 O worker atual ainda extrai e segmenta documentos: não consulta este índice,
 não executa o motor híbrido e não persiste resultados de similaridade.
-As próximas entregas são busca Top-N na referência, integração lexical/SBERT,
-combinação e persistência de resultados, endpoints de relatório e telas.
+A busca Top-N está disponível pelo serviço e pela CLI descritos a seguir.
+Combinação híbrida, integração ao worker, persistência de resultados,
+endpoints de relatório e telas continuam como próximas etapas.
+
+## Busca de referências — etapa 10
+
+`ReferenceSearchService` recebe o **texto original de um segmento** e recupera
+segmentos das fontes PAN inglesas já preparadas. A consulta aplica `transform`
+no TF-IDF persistido e gera somente o embedding SBERT da consulta, preservando
+seu texto original. As matrizes CSR e os embeddings em memmap são reutilizados;
+Jaccard usa os tokens lexicais persistidos, sem reprocessar cada referência.
+
+### Ranking, filtros e configuração
+
+| Modo | Elegibilidade | Ordenação |
+|---|---|---|
+| `semantic` (padrão) | Cosseno semântico ≥ limiar semântico | Cosseno semântico decrescente |
+| `lexical` | Cosseno TF-IDF ≥ limiar lexical **e** Jaccard ≥ seu limiar | Cosseno TF-IDF decrescente |
+
+Não há filtro lexical no modo semântico nem filtro semântico no modo lexical.
+Assim, uma consulta sem tokens no vocabulário TF-IDF, inclusive composta apenas
+de stopwords, ainda pode recuperar candidatos semânticos. O AND lexical
+existente é preservado somente como elegibilidade do modo lexical.
+
+Empates são resolvidos pelo ID do segmento crescente. O limite é aplicado
+**depois** dos filtros, inclusive Jaccard: são retornados até Top-N
+**segmentos**, podendo haver vários do mesmo documento. Não há combinação de
+scores, bônus por fonte conhecida ou uso de ground truth no ranking.
+
+| Configuração | Padrão | Valores aceitos |
+|---|---|---|
+| `REFERENCE_SEARCH_MODE` | `semantic` | `semantic` ou `lexical` |
+| `REFERENCE_SEARCH_TOP_N` | `5` | Inteiro positivo |
+| `REFERENCE_SEARCH_SEMANTIC_THRESHOLD` | `0.5` | Número finito entre -1 e 1 |
+| `LEXICAL_COSINE_THRESHOLD` | `0.5` | Número finito entre 0 e 1 |
+| `LEXICAL_JACCARD_THRESHOLD` | `0.2` | Número finito entre 0 e 1 |
+| `REFERENCE_INDEX_DIR` | `data/reference-index` | Diretório do índice compatível com o banco |
+
+Esses limiares são **parâmetros calibráveis de recuperação**, não valores
+cientificamente validados nem regras finais do motor híbrido da etapa 11.
+Os filtros são inclusivos, sem arredondamento prévio; scores semânticos
+negativos são preservados. O resultado não classifica cópia, paráfrase ou plágio.
+
+### CLI
+
+Use `--text` ou `--text-file` (UTF-8, contendo um único segmento), nunca ambos.
+O arquivo não é extraído nem segmentado automaticamente. O exemplo usa
+explicitamente a base experimental, sem conectar ao PostgreSQL da aplicação:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.search_references `
+    --text "The student submitted the final assignment." `
+    --database-url "sqlite:///data/pan-experiment.sqlite3" `
+    --index-dir data\pan-experiment-index --mode semantic --top-n 5
+```
+
+Para a via lexical, mantendo a elegibilidade AND:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.search_references `
+    --text-file segmento.txt --mode lexical --top-n 10 `
+    --lexical-cosine-threshold 0.5 --lexical-jaccard-threshold 0.2 `
+    --database-url "sqlite:///data/pan-experiment.sqlite3" `
+    --index-dir data\pan-experiment-index
+```
+
+`--semantic-threshold` também permite sobrescrever o limiar semântico.
+Parâmetros omitidos usam as configurações do backend. `--help` não precisa de
+configuração do banco ou do modelo; a busca usa o `.env` normal, como a
+preparação PAN, sem se conectar ao Redis.
+
+A saída é JSON em stdout. Erros vão para stderr, com código de saída não zero.
+SQLite é aberto em **somente leitura**: arquivo ausente não é criado e esta
+CLI não oferece `--init-db`, importação, migrations ou reconstrução do índice.
+Não associe `pan-experiment-index` a outro banco: a identidade é validada antes
+da primeira consulta.
+
+Com o modelo já presente no cache local, é possível impedir acesso à rede
+durante uma execução:
+
+```powershell
+$env:HF_HUB_OFFLINE = "1"
+$env:TRANSFORMERS_OFFLINE = "1"
+```
+
+As variáveis acima valem para o terminal atual; em modo offline, modelo ausente
+é um erro, não um resultado vazio. API e worker já recebem as configurações de
+busca pelo Compose. Após reconstruir a imagem, a CLI também pode ser executada
+no container, sem iniciar dependências:
+
+```powershell
+docker compose run --rm --no-deps api python -m scripts.search_references `
+    --text "The student submitted the final assignment." --mode semantic `
+    --database-url "sqlite:///data/pan-experiment.sqlite3" `
+    --index-dir /app/data/pan-experiment-index
+```
+
+Nesse comando, os caminhos são internos ao container e o modelo usa o cache
+configurado nele (`/app/data/huggingface`), não automaticamente o cache do host.
+
+### Contrato público e reutilização
+
+```python
+from pathlib import Path
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
+from app.repositories.references import ReferenceRepository
+from app.services.references.reference_search import ReferenceSearchService
+
+engine = create_engine(
+    "sqlite:///file:data/pan-experiment.sqlite3?mode=ro&uri=true"
+)
+try:
+    with Session(engine, autoflush=False) as db:
+        search = ReferenceSearchService(
+            ReferenceRepository(db), Path(r"data\pan-experiment-index")
+        )
+        result = search.search(
+            "The student submitted the final assignment.",
+            mode="semantic",
+            top_n=5,
+            semantic_threshold=0.5,
+        )
+        # Reutilize search para os demais segmentos do documento/lote.
+finally:
+    engine.dispose()
+```
+
+`search()` também aceita `lexical_cosine_threshold` e
+`lexical_jaccard_threshold`. O retorno é uma dataclass imutável,
+`ReferenceSearchResult`, serializável com `dataclasses.asdict()`:
+
+| Campo | Conteúdo |
+|---|---|
+| `options` | Modo, Top-N e os três limiares efetivamente usados |
+| `index_fingerprint` | Identidade da base preparada correspondente ao índice |
+| `matches` | Sequência ordenada de correspondências |
+| `comparison_ms` | Tempo da consulta em milissegundos |
+
+Cada correspondência contém `source_document` (id, corpus_id, source, language,
+title), `source_segment` (id, position, start_offset, end_offset, text_original),
+`lexical_score`, `semantic_score` e `jaccard_score`. Textos e offsets vêm do banco;
+não são reconstruídos a partir de tokens. Não são retornados objetos ORM,
+score híbrido ou rótulo `is_suspicious`.
+
+`comparison_ms` inclui pré-processamento da consulta, seu embedding,
+comparações e leitura dos candidatos. Exclui inicialização do serviço e
+validação dos artefatos; a primeira consulta pode incluir a carga do modelo.
+As consultas seguintes reutilizam o índice e o modelo em memória, buscando
+metadados em lotes, sem uma consulta SQL por candidato.
+
+O serviço trabalha com um **snapshot offline imutável durante seu uso**.
+Fingerprint, alinhamento de IDs, hashes e validade dos vetores são conferidos
+na abertura, não a cada segmento. Mantenha a sessão SQLAlchemy aberta e não
+compartilhe a mesma instância entre execuções concorrentes. Antes de reutilizar
+o serviço após uma importação ou alteração da referência, chame
+`search.revalidate()` entre documentos/lotes ou crie uma nova instância.
+Revalidação não importa nem reindexa: base e índice já precisam ser coerentes.
+
+Candidatos ausentes ou com texto, offsets ou identidade de preparação alterados
+invalidam a instância. Mudanças arbitrárias em candidatos não consultados só
+são detectadas na revalidação integral; não há monitoramento concorrente da base.
+Uma revalidação malsucedida não permite voltar silenciosamente ao snapshot antigo.
+Base vazia, índice ausente/corrompido/desatualizado, modelo incompatível e vetores
+inválidos são erros. `matches` vazio significa apenas que nenhum candidato do
+snapshot validado atingiu os filtros.
+
+Esta etapa não muda `DocumentProcessingService` nem a task Celery: uploads
+continuam no fluxo de extração e segmentação. Integração ao processamento,
+combinação das métricas, percentuais globais, persistência e relatórios ficam
+para as etapas seguintes.
 
 ---
 
