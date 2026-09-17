@@ -14,6 +14,22 @@ from app.main import app
 from app.models.auth import User
 from app.services.documents import upload_service
 from app.services.documents.document_processing import DocumentProcessingService
+from app.services.analysis.hybrid_contracts import DocumentAnalysis
+
+
+class FakeHybridAnalysisService:
+    def analyze_document(self, document):
+        return DocumentAnalysis(
+            document_id=document.id,
+            total_segments=0,
+            analyzed_segments=0,
+            suspicious_segments=0,
+            segments=(),
+            overall_score=0.0,
+            suspicious_segment_percentage=0.0,
+            lexical_ms=2,
+            semantic_ms=3,
+        )
 
 
 @pytest.fixture()
@@ -85,7 +101,10 @@ def run_pending_workers(client):
             document_id = client.dispatched.pop(0)
             db = client.session_factory()
             try:
-                DocumentProcessingService(db).process_document(document_id)
+                DocumentProcessingService(
+                    db,
+                    hybrid_analysis_factory=lambda: FakeHybridAnalysisService(),
+                ).process_document(document_id)
             finally:
                 db.close()
 

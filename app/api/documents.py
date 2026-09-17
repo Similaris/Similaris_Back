@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.auth import get_current_user
 from app.core.database import get_db
@@ -7,9 +8,11 @@ from app.models.auth import User
 from app.repositories.analysis import DocumentRepository, SegmentRepository
 from app.schemas.analysis import (
     BatchUploadOut,
+    DocumentAnalysisOut,
     DocumentOut,
     SegmentOut,
 )
+from app.services.analysis.analysis_report import AnalysisReportService
 from app.services.documents import (
     FileTooLargeError,
     UnsupportedDocumentTypeError,
@@ -34,7 +37,9 @@ async def upload_documents(
     ]
 
     try:
-        result = UploadService(db).upload_documents(current_user.id, payloads)
+        result = await run_in_threadpool(
+            UploadService(db).upload_documents, current_user.id, payloads
+        )
     except FileTooLargeError as error:
         raise HTTPException(status_code=413, detail=str(error))
     except UnsupportedDocumentTypeError as error:
@@ -74,3 +79,20 @@ def list_document_segments(
         raise HTTPException(status_code=404, detail="Documento não encontrado.")
 
     return SegmentRepository(db).list_by_document(document_id)
+
+
+@router.get("/{document_id}/analysis", response_model=DocumentAnalysisOut)
+def get_document_analysis(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Retorna status, agregados e correspondencias da analise do documento."""
+    document = DocumentRepository(db).get_by_id_for_user(
+        document_id, current_user.id
+    )
+    if document is None:
+        raise HTTPException(status_code=404, detail="Documento nao encontrado.")
+
+    analysis = AnalysisReportService(db).build_document_analysis(document)
+    return DocumentAnalysisOut.from_analysis(document, analysis)

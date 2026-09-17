@@ -7,6 +7,7 @@ from app.services.documents.exceptions import (
     EmptyUploadError,
     FileTooLargeError,
     InvalidDocumentError,
+    RetryableDocumentProcessingError,
     UnsupportedDocumentTypeError,
     UploadValidationError,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "EmptyUploadError",
     "FileTooLargeError",
     "InvalidDocumentError",
+    "RetryableDocumentProcessingError",
     "UnsupportedDocumentTypeError",
     "UploadFilePayload",
     "UploadResult",

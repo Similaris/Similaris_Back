@@ -42,3 +42,13 @@ docker compose up -d db  # recria executando as migrations
 ```powershell
 docker exec -i similaris-db psql -U similaris -d similaris < migrations\001_create_users.sql
 ```
+
+## Integração do motor híbrido
+
+Em bancos já existentes, aplique a migration 009 antes de iniciar os workers
+com o pipeline completo:
+
+```powershell
+Get-Content -Raw migrations\009_integrate_hybrid_analysis.sql |
+    docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```

@@ -20,6 +20,32 @@ class Settings(BaseSettings):
     reference_search_mode: Literal["semantic", "lexical"] = "semantic"
     reference_search_top_n: int = Field(default=5, ge=1)
     reference_search_semantic_threshold: float = Field(default=0.5, ge=-1.0, le=1.0)
+    hybrid_tfidf_weight: float = Field(default=0.7, ge=0.0, le=1.0)
+    hybrid_jaccard_weight: float = Field(default=0.3, ge=0.0, le=1.0)
+    hybrid_lexical_weight: float = Field(default=0.5, ge=0.0, le=1.0)
+    hybrid_semantic_weight: float = Field(default=0.5, ge=0.0, le=1.0)
+    hybrid_classification_moderate_threshold: float = Field(
+        default=0.4, ge=0.0, le=1.0
+    )
+    hybrid_classification_high_threshold: float = Field(
+        default=0.6, ge=0.0, le=1.0
+    )
+    hybrid_classification_very_high_threshold: float = Field(
+        default=0.8, ge=0.0, le=1.0
+    )
+    hybrid_suspicious_final_threshold: float = Field(
+        default=0.6, ge=0.0, le=1.0
+    )
+    hybrid_suspicious_semantic_threshold: float = Field(
+        default=0.8, ge=0.0, le=1.0
+    )
+    hybrid_suspicious_tfidf_threshold: float = Field(
+        default=0.7, ge=0.0, le=1.0
+    )
+    hybrid_suspicious_jaccard_threshold: float = Field(
+        default=0.5, ge=0.0, le=1.0
+    )
+    hybrid_top_n: int = Field(default=5, ge=1)
     upload_dir: str = "uploads"
     upload_max_file_size_mb: int = Field(default=20, ge=1)
 

@@ -13,6 +13,8 @@ class DocumentOut(BaseModel):
     status: str
     error_message: str | None = None
     extraction_ms: int | None = None
+    lexical_ms: int | None = None
+    semantic_ms: int | None = None
     created_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None

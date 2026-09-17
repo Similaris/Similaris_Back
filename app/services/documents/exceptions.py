@@ -24,3 +24,7 @@ class EmptyUploadError(UploadValidationError):
 
 class FileTooLargeError(UploadValidationError):
     """Raised when an uploaded file exceeds the size limit."""
+
+
+class RetryableDocumentProcessingError(RuntimeError):
+    """Falha de infraestrutura que permite uma nova tentativa pelo Celery."""
