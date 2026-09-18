@@ -17,6 +17,14 @@ celery_app.conf.update(
     # Distribui os documentos do lote entre os workers disponíveis em vez
     # de deixar um único worker reservar várias mensagens de uma vez.
     worker_prefetch_multiplier=1,
+    broker_connection_retry_on_startup=True,
+    task_publish_retry=True,
+    task_publish_retry_policy={
+        "max_retries": 5,
+        "interval_start": 0,
+        "interval_step": 1,
+        "interval_max": 5,
+    },
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",

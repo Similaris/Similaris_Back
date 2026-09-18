@@ -4,7 +4,16 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Index, Numeric, String, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -19,6 +28,11 @@ class AnalysisResult(Base):
 
     __tablename__ = "analysis_results"
     __table_args__ = (
+        UniqueConstraint(
+            "segment_id",
+            "reference_segment_id",
+            name="uq_analysis_results_segment_reference",
+        ),
         Index("ix_analysis_results_document_id", "document_id"),
         Index("ix_analysis_results_segment_id", "segment_id"),
     )
@@ -36,8 +50,12 @@ class AnalysisResult(Base):
     lexical_cosine: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     lexical_jaccard: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     semantic_cosine: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
+    lexical_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
     final_score: Mapped[Decimal] = mapped_column(Numeric(5, 4), nullable=False)
     plagiarism_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_suspicious: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="false"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

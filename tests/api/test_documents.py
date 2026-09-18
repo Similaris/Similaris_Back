@@ -38,6 +38,13 @@ def test_upload_creates_pending_batch_and_dispatches_processing(client, build_do
     assert segments_response.status_code == 200
     assert segments_response.json() == []
 
+    analysis_response = client.get(f"/api/documents/{document['id']}/analysis")
+    assert analysis_response.status_code == 200
+    analysis = analysis_response.json()
+    assert analysis["status"] == "pendente"
+    assert analysis["total_segments"] == 0
+    assert analysis["segments"] == []
+
 
 def test_upload_then_worker_processing_generates_segments(
     client, build_docx, run_pending_workers

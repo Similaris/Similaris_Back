@@ -8,12 +8,26 @@ from app.schemas.analysis.document import (
     DocumentOut,
     SegmentOut,
 )
+from app.schemas.analysis.result import (
+    BatchAnalysisOut,
+    DocumentAnalysisOut,
+    HybridMatchOut,
+    ReferenceDocumentOut,
+    ReferenceSegmentOut,
+    SegmentAnalysisOut,
+)
 
 __all__ = [
     "BatchDetailOut",
+    "BatchAnalysisOut",
     "BatchDocumentCounts",
     "BatchSummaryOut",
     "BatchUploadOut",
     "DocumentOut",
+    "DocumentAnalysisOut",
+    "HybridMatchOut",
+    "ReferenceDocumentOut",
+    "ReferenceSegmentOut",
+    "SegmentAnalysisOut",
     "SegmentOut",
 ]

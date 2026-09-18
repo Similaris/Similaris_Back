@@ -214,11 +214,10 @@ docker compose run --rm --no-deps api python -m scripts.prepare_pan_corpus prepa
 A pasta no comando acima é o caminho Linux **dentro do container**. O comando
 não inicia dependências; PostgreSQL deve estar disponível.
 
-O worker atual ainda extrai e segmenta documentos: não consulta este índice,
-não executa o motor híbrido e não persiste resultados de similaridade.
-A busca Top-N está disponível pelo serviço e pela CLI descritos a seguir.
-Combinação híbrida, integração ao worker, persistência de resultados,
-endpoints de relatório e telas continuam como próximas etapas.
+O worker extrai, segmenta e analisa cada documento por uma task Celery
+independente. Ele consulta este índice nos modos lexical e semântico, executa o
+motor híbrido e persiste os resultados por par de segmentos. A busca Top-N
+também permanece disponível pelo serviço e pela CLI descritos a seguir.
 
 ## Busca de referências — etapa 10
 
@@ -384,10 +383,71 @@ Base vazia, índice ausente/corrompido/desatualizado, modelo incompatível e vet
 inválidos são erros. `matches` vazio significa apenas que nenhum candidato do
 snapshot validado atingiu os filtros.
 
-Esta etapa não muda `DocumentProcessingService` nem a task Celery: uploads
-continuam no fluxo de extração e segmentação. Integração ao processamento,
-combinação das métricas, percentuais globais, persistência e relatórios ficam
-para as etapas seguintes.
+O serviço de busca é reutilizado pelo motor híbrido no worker. O upload apenas
+persiste os arquivos e publica uma task por documento; a análise ocorre fora da
+requisição HTTP.
+
+---
+
+## Motor híbrido — etapa 11
+
+`HybridAnalysisService` reúne, para cada segmento do documento, a união dos
+candidatos retornados pelos modos `lexical` e `semantic` da busca de referências.
+Resultados repetidos são consolidados pelo ID do segmento de referência antes
+do cálculo, portanto scores de referências diferentes nunca são combinados.
+
+```python
+from app.services.analysis.hybrid_analysis import HybridAnalysisService
+
+analysis = HybridAnalysisService(db).analyze_document(document)
+```
+
+O serviço produz dataclasses imutáveis e o worker persiste cada par em
+`AnalysisResult`. A busca existente calcula TF-IDF, Jaccard e SBERT para cada
+candidato recuperado, inclusive quando ele veio de apenas um dos modos.
+
+As regras padrão são:
+
+```text
+lexical_score = 0.7 * tfidf_score + 0.3 * jaccard_score
+final_score   = 0.5 * lexical_score + 0.5 * semantic_score
+overall_score = média do melhor final_score de cada segmento
+```
+
+Scores semânticos negativos são limitados a zero no contrato híbrido, mantendo
+todas as métricas e resultados calculados no intervalo de 0 a 1. A classificação
+é `LOW` abaixo de 0.40, `MODERATE` a partir de 0.40, `HIGH` a partir de 0.60 e
+`VERY_HIGH` a partir de 0.80. Um match é indicativamente suspeito quando o score
+final é pelo menos 0.60, o semântico é pelo menos 0.80, ou TF-IDF e Jaccard são,
+respectivamente, pelo menos 0.70 e 0.50.
+
+Pesos, thresholds e o limite final por segmento são configuráveis por estas
+variáveis: `HYBRID_TFIDF_WEIGHT`, `HYBRID_JACCARD_WEIGHT`,
+`HYBRID_LEXICAL_WEIGHT`, `HYBRID_SEMANTIC_WEIGHT`,
+`HYBRID_CLASSIFICATION_MODERATE_THRESHOLD`,
+`HYBRID_CLASSIFICATION_HIGH_THRESHOLD`,
+`HYBRID_CLASSIFICATION_VERY_HIGH_THRESHOLD`,
+`HYBRID_SUSPICIOUS_FINAL_THRESHOLD`, `HYBRID_SUSPICIOUS_SEMANTIC_THRESHOLD`,
+`HYBRID_SUSPICIOUS_TFIDF_THRESHOLD`, `HYBRID_SUSPICIOUS_JACCARD_THRESHOLD` e
+`HYBRID_TOP_N`. Cada par de pesos deve somar 1.0 e os thresholds de
+classificação devem estar em ordem crescente.
+
+`DocumentAnalysis` contém os totais do documento, a sequência de
+`SegmentAnalysis`, `overall_score` e `suspicious_segment_percentage`. Esta última
+é uma proporção indicativa de segmentos, não um percentual confirmado de
+plágio.
+
+O pipeline completo é disparado por `documents.process_document`, com até três
+retries exponenciais para falhas transitórias. Os resultados podem ser
+consultados em:
+
+```text
+GET /api/documents/{document_id}/analysis
+GET /api/batches/{batch_id}/analysis
+```
+
+Em volumes PostgreSQL existentes, aplique
+`migrations/009_integrate_hybrid_analysis.sql` antes de iniciar os workers.
 
 ---
 

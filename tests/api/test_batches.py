@@ -79,6 +79,17 @@ def test_batch_detail_after_processing(client, build_docx, run_pending_workers):
         assert document["finished_at"] is not None
         assert document["extraction_ms"] is not None
 
+    analysis_response = client.get(f"/api/batches/{batch_id}/analysis")
+    assert analysis_response.status_code == 200
+    analysis = analysis_response.json()
+    assert analysis["batch_id"] == batch_id
+    assert analysis["status"] == "concluido"
+    assert len(analysis["documents"]) == 2
+    assert all(
+        document["status"] == "concluido"
+        for document in analysis["documents"]
+    )
+
 
 def test_batch_detail_of_unknown_batch_returns_404(client):
     response = client.get("/api/batches/999")

@@ -11,7 +11,21 @@ from app.core.config import settings
 from app.core.database import Base
 from app.models.analysis import Batch, Document, Segment
 from app.services.documents.file_storage import store_document_file
+from app.services.analysis.hybrid_contracts import DocumentAnalysis
 from app.tasks.document_tasks import process_document
+
+
+class FakeHybridAnalysisService:
+    def analyze_document(self, document):
+        return DocumentAnalysis(
+            document_id=document.id,
+            total_segments=0,
+            analyzed_segments=0,
+            suspicious_segments=0,
+            segments=(),
+            overall_score=0.0,
+            suspicious_segment_percentage=0.0,
+        )
 
 
 def build_docx(*paragraphs: str) -> bytes:
@@ -39,6 +53,10 @@ def session_factory(tmp_path, monkeypatch):
     # A task abre a própria sessão via app.core.database.SessionLocal;
     # aqui apontamos para o banco de teste.
     monkeypatch.setattr(database, "SessionLocal", factory)
+    monkeypatch.setattr(
+        "app.services.analysis.hybrid_analysis.HybridAnalysisService",
+        lambda db: FakeHybridAnalysisService(),
+    )
     return factory
 
 
@@ -74,3 +92,4 @@ def test_process_document_task_runs_pipeline(session_factory):
 def test_process_document_task_is_registered_with_stable_name():
     # O nome estável desacopla o roteamento das mensagens do caminho do módulo.
     assert process_document.name == "documents.process_document"
+    assert process_document.max_retries == 3
