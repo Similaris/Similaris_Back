@@ -8,6 +8,7 @@ from app.schemas.analysis.document import (
     DocumentOut,
     SegmentOut,
 )
+from app.schemas.analysis.dashboard import DashboardOut
 from app.schemas.analysis.result import (
     BatchAnalysisOut,
     DocumentAnalysisOut,
@@ -24,6 +25,7 @@ __all__ = [
     "BatchSummaryOut",
     "BatchUploadOut",
     "DocumentOut",
+    "DashboardOut",
     "DocumentAnalysisOut",
     "HybridMatchOut",
     "ReferenceDocumentOut",
