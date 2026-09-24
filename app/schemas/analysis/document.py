@@ -15,6 +15,8 @@ class DocumentOut(BaseModel):
     extraction_ms: int | None = None
     lexical_ms: int | None = None
     semantic_ms: int | None = None
+    analysis_profile: dict | None = None
+    reference_fingerprint: str | None = None
     created_at: datetime
     started_at: datetime | None = None
     finished_at: datetime | None = None
