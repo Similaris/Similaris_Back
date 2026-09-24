@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 import app.models  # noqa: F401  (registra os modelos no metadata)
@@ -20,6 +23,30 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, version=settings.version, lifespan=lifespan)
+
+
+@app.exception_handler(HTTPException)
+async def http_error_handler(_: Request, error: HTTPException):
+    return JSONResponse(
+        status_code=error.status_code,
+        content={
+            "code": f"http_{error.status_code}",
+            "detail": jsonable_encoder(error.detail),
+        },
+        headers=error.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error_handler(_: Request, error: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "code": "validation_error",
+            "detail": "Os dados enviados são inválidos.",
+            "errors": jsonable_encoder(error.errors()),
+        },
+    )
 
 app.add_middleware(
     CORSMiddleware,
