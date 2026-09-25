@@ -296,7 +296,8 @@ def test_index_and_fingerprint_are_reused_and_tfidf_is_never_refitted(
     assert load.call_count == fingerprint.call_count == 1
     assert transform.call_count == 2
     assert transform.call_args.args == (["orchard fruit trees"],)
-    assert search_corpus.query_encoder.call_count == 2
+    # A consulta repetida reutiliza o embedding normalizado no mesmo serviço.
+    assert search_corpus.query_encoder.call_count == 1
     search_corpus.reference_encoder.assert_not_called()
     no_fit.assert_not_called()
     service.revalidate()

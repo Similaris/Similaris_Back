@@ -33,6 +33,9 @@ class FakeBatchRepository:
         self.created_batches.append(batch)
         return batch
 
+    def save(self, batch):
+        return batch
+
 
 class FakeDocumentRepository:
     def __init__(self):
@@ -159,3 +162,20 @@ def test_upload_documents_rejects_file_above_size_limit(monkeypatch, tmp_path):
 
     assert batch_repository.created_batches == []
     assert dispatched == []
+
+
+def test_dispatch_failure_marks_document_and_batch_as_failed(monkeypatch, tmp_path):
+    service, _, document_repository, _ = build_service(monkeypatch, tmp_path)
+    service.dispatch_document = lambda _document_id: (_ for _ in ()).throw(
+        ConnectionError("broker unavailable")
+    )
+
+    result = service.upload_documents(
+        user_id=1,
+        files=[UploadFilePayload(filename="paper.docx", content=build_docx("Text"))],
+    )
+
+    assert result.batch.status == "erro"
+    assert result.batch.finished_at is not None
+    assert document_repository.documents[0].status == "erro"
+    assert "enviar o documento" in document_repository.documents[0].error_message

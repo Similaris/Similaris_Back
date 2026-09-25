@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CHAR, DateTime, ForeignKey, Index, Numeric, String, Text, func
+from sqlalchemy import CHAR, JSON, DateTime, ForeignKey, Index, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -39,6 +39,8 @@ class Document(Base):
     extraction_ms: Mapped[int | None]
     lexical_ms: Mapped[int | None]
     semantic_ms: Mapped[int | None]
+    analysis_profile: Mapped[dict | None] = mapped_column(JSON)
+    reference_fingerprint: Mapped[str | None] = mapped_column(CHAR(64))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

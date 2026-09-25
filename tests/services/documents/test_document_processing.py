@@ -106,6 +106,8 @@ def test_process_document_completes_and_persists_segments(session_factory):
     assert document.extraction_ms is not None
     assert document.lexical_ms == 2
     assert document.semantic_ms == 3
+    assert document.analysis_profile["semantic_model"] == settings.semantic_model_name
+    assert document.analysis_profile["segment_max_words"] == settings.segment_max_words
     assert float(document.plagiarism_percent) == 0.0
     assert document.started_at is not None
     assert document.finished_at is not None
@@ -238,6 +240,7 @@ def test_process_document_runs_hybrid_analysis_and_persists_matches(session_fact
     assert stored[0].reference_segment_id == reference_segment.id
     assert float(stored[0].final_score) == pytest.approx(0.8365)
     assert stored[0].is_suspicious is True
+    assert document.reference_fingerprint == "a" * 64
     db.close()
 
 

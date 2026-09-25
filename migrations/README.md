@@ -12,6 +12,8 @@ Scripts SQL de criação das tabelas do Similaris (PostgreSQL), numerados na ord
 | `006_create_reference_segments.sql` | `reference_segments` | Trechos da base de referência |
 | `007_create_analysis_results.sql` | `analysis_results` | Scores por par de trechos |
 | `008_prepare_reference_corpus.sql` | `reference_docs`, `reference_segments` | Identidade do corpus, hashes, idioma inglês e offsets originais |
+| `009_integrate_hybrid_analysis.sql` | `analysis_results` | Score lexical combinado e decisão de suspeita persistida |
+| `010_version_analysis_results.sql` | `documents` | Perfil e identidade da base usados na análise |
 
 ## Atualização de um banco existente
 

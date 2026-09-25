@@ -19,6 +19,7 @@ from app.services.documents.exceptions import (
     DocumentExtractionError,
     RetryableDocumentProcessingError,
 )
+from app.core.config import settings
 
 if TYPE_CHECKING:
     from app.services.analysis.hybrid_analysis import HybridAnalysisService
@@ -77,6 +78,10 @@ class DocumentProcessingService:
                 document, "Arquivo não encontrado no armazenamento."
             )
             return
+        except OSError as error:
+            raise RetryableDocumentProcessingError(
+                f"Falha temporaria ao acessar o documento {document_id}: {error}"
+            ) from error
 
         try:
             started = time.perf_counter()
@@ -98,6 +103,28 @@ class DocumentProcessingService:
             document.plagiarism_percent = Decimal(
                 str(round(analysis.overall_score * 100, 2))
             )
+            document.analysis_profile = {
+                "version": 1,
+                "semantic_model": settings.semantic_model_name,
+                "segment_max_words": settings.segment_max_words,
+                "lexical_cosine_threshold": settings.lexical_cosine_threshold,
+                "lexical_jaccard_threshold": settings.lexical_jaccard_threshold,
+                "semantic_threshold": settings.reference_search_semantic_threshold,
+                "reference_search_top_n": settings.reference_search_top_n,
+                "tfidf_weight": settings.hybrid_tfidf_weight,
+                "jaccard_weight": settings.hybrid_jaccard_weight,
+                "lexical_weight": settings.hybrid_lexical_weight,
+                "semantic_weight": settings.hybrid_semantic_weight,
+                "moderate_threshold": settings.hybrid_classification_moderate_threshold,
+                "high_threshold": settings.hybrid_classification_high_threshold,
+                "very_high_threshold": settings.hybrid_classification_very_high_threshold,
+                "suspicious_final_threshold": settings.hybrid_suspicious_final_threshold,
+                "suspicious_semantic_threshold": settings.hybrid_suspicious_semantic_threshold,
+                "suspicious_tfidf_threshold": settings.hybrid_suspicious_tfidf_threshold,
+                "suspicious_jaccard_threshold": settings.hybrid_suspicious_jaccard_threshold,
+                "top_n": settings.hybrid_top_n,
+            }
+            document.reference_fingerprint = analysis.reference_fingerprint
             document.status = "concluido"
         except Exception as error:
             self.db.rollback()
@@ -105,10 +132,16 @@ class DocumentProcessingService:
                 f"Falha temporaria no processamento do documento {document_id}: {error}"
             ) from error
 
-        document.error_message = None
-        document.finished_at = datetime.now(UTC)
-        self.document_repository.save(document)
-        self._finalize_batch_if_done(document.batch)
+        try:
+            document.error_message = None
+            document.finished_at = datetime.now(UTC)
+            self.document_repository.save(document)
+            self._finalize_batch_if_done(document.batch)
+        except Exception as error:
+            self.db.rollback()
+            raise RetryableDocumentProcessingError(
+                f"Falha temporaria ao finalizar o documento {document_id}: {error}"
+            ) from error
 
     def mark_failed_after_retries(self, document_id: int, message: str) -> None:
         self.db.rollback()

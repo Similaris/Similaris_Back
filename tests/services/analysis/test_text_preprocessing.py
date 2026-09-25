@@ -20,6 +20,14 @@ def test_tokenize_removes_punctuation_and_symbols():
     assert tokenize(text) == ["hello", "world", "test", "plagiarism", "100"]
 
 
+def test_tokenize_normalizes_unicode_and_pdf_line_break_hyphens():
+    assert tokenize("Ｓｉｍｉｌａｒ soft\u00adhyphen detec-\ntion") == [
+        "similar",
+        "softhyphen",
+        "detection",
+    ]
+
+
 def test_tokenize_handles_empty_and_none_text():
     assert tokenize("") == []
     assert tokenize(None) == []

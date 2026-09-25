@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from functools import lru_cache
 
 import nltk
 from nltk.corpus import stopwords
 
 _TOKEN = re.compile(r"[^\W_]+", re.UNICODE)
+_LINE_BREAK_HYPHEN = re.compile(r"(?<=\w)-[ \t]*\r?\n[ \t]*(?=\w)")
 
 
 def _ensure_stopwords_corpus() -> None:
@@ -25,8 +27,14 @@ def get_english_stopwords() -> frozenset[str]:
 
 
 def tokenize(text: str) -> list[str]:
-    """Converte o texto para minúsculas e extrai tokens sem pontuação."""
-    return _TOKEN.findall((text or "").lower())
+    """Normaliza Unicode e extrai tokens sem pontuação.
+
+    Hífens inseridos por quebra de linha em PDFs são removidos somente na via
+    lexical. O texto original e seus offsets permanecem intactos.
+    """
+    normalized = unicodedata.normalize("NFKC", text or "").replace("\u00ad", "")
+    normalized = _LINE_BREAK_HYPHEN.sub("", normalized).casefold()
+    return _TOKEN.findall(normalized)
 
 
 def preprocess_tokens(text: str) -> list[str]:

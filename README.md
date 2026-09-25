@@ -444,10 +444,31 @@ consultados em:
 ```text
 GET /api/documents/{document_id}/analysis
 GET /api/batches/{batch_id}/analysis
+POST /api/documents/{document_id}/retry
 ```
 
-Em volumes PostgreSQL existentes, aplique
-`migrations/009_integrate_hybrid_analysis.sql` antes de iniciar os workers.
+`GET /api/health` verifica somente se o processo da API está vivo. Use
+`GET /api/ready` para confirmar PostgreSQL, Redis, workers Celery, documentos e
+segmentos de referência e o índice ativo. Uma resposta 503 informa cada
+dependência ausente.
+
+Cada documento concluído registra `analysis_profile` e
+`reference_fingerprint`. Assim, o relatório preserva a política de pontuação e
+a base usadas na execução, mesmo após uma mudança de configuração.
+
+Para medir a recuperação contra as anotações externas da PAN-PC-11:
+
+```powershell
+python -m scripts.evaluate_pan_retrieval `
+    --corpus-dir data\pan-pc-11 `
+    --database-url $env:DATABASE_URL `
+    --index-dir data\reference-index `
+    --limit 100
+```
+
+A saída apresenta precisão@N, recall@N, F1@N e MRR, além dos casos ignorados
+porque a fonte ainda não foi importada. Em volumes PostgreSQL existentes,
+aplique as migrations 009 e 010 antes de iniciar os workers.
 
 ---
 
