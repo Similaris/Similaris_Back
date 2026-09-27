@@ -104,6 +104,8 @@ class DocumentAnalysisOut(BaseModel):
     extraction_ms: int | None
     lexical_ms: int
     semantic_ms: int
+    analysis_profile: dict | None
+    reference_fingerprint: str | None
     segments: list[SegmentAnalysisOut]
 
     @classmethod
@@ -123,6 +125,8 @@ class DocumentAnalysisOut(BaseModel):
             extraction_ms=document.extraction_ms,
             lexical_ms=analysis.lexical_ms,
             semantic_ms=analysis.semantic_ms,
+            analysis_profile=document.analysis_profile,
+            reference_fingerprint=document.reference_fingerprint,
             segments=[
                 SegmentAnalysisOut.from_analysis(segment)
                 for segment in analysis.segments

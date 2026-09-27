@@ -21,5 +21,12 @@ def process_document(self, document_id: int) -> None:
                 raise
             countdown = RETRY_BASE_SECONDS * (2 ** self.request.retries)
             raise self.retry(exc=error, countdown=countdown)
+        except Exception as error:
+            message = f"Falha inesperada no processamento: {type(error).__name__}"
+            if self.request.retries >= self.max_retries:
+                service.mark_failed_after_retries(document_id, message)
+                raise
+            countdown = RETRY_BASE_SECONDS * (2 ** self.request.retries)
+            raise self.retry(exc=error, countdown=countdown)
     finally:
         db.close()

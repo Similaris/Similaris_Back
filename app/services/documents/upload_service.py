@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Callable
 
@@ -79,7 +80,25 @@ class UploadService:
         documents = [self._store_file(batch, payload) for payload in files]
 
         for document in documents:
-            self.dispatch_document(document.id)
+            try:
+                self.dispatch_document(document.id)
+            except Exception:
+                document.status = "erro"
+                document.error_message = (
+                    "Não foi possível enviar o documento para processamento. "
+                    "Tente enviar o arquivo novamente."
+                )
+                document.finished_at = datetime.now(UTC)
+                self.document_repository.save(document)
+
+        if all(document.status in {"concluido", "erro"} for document in documents):
+            batch.status = (
+                "concluido"
+                if any(document.status == "concluido" for document in documents)
+                else "erro"
+            )
+            batch.finished_at = datetime.now(UTC)
+            self.batch_repository.save(batch)
 
         return UploadResult(batch=batch, documents=documents)
 

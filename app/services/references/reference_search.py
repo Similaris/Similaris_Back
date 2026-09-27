@@ -66,12 +66,16 @@ class ReferenceSearchService:
         self._index: CorpusIndex | None = None
         self._signatures: dict[int, bytes] = {}
         self._model_name: str | None = None
+        self._cached_query_text: str | None = None
+        self._cached_query_embedding: NDArray[np.float32] | None = None
         self.revalidate()
 
     def revalidate(self) -> None:
         """Reabre o indice e valida a base; uma falha invalida a instancia."""
         self._index = None
         self._signatures = {}
+        self._cached_query_text = None
+        self._cached_query_embedding = None
         signatures: dict[int, bytes] = {}
         fingerprint, rows, _ = reference_fingerprint(
             self.repository, on_segment=signatures.__setitem__
@@ -172,8 +176,14 @@ class ReferenceSearchService:
             comparison_ms=(perf_counter() - started) * 1000,
         )
 
-    @staticmethod
-    def _query_embedding(text_original: str, index: CorpusIndex) -> NDArray[np.float32]:
+    def _query_embedding(
+        self, text_original: str, index: CorpusIndex
+    ) -> NDArray[np.float32]:
+        if (
+            self._cached_query_text == text_original
+            and self._cached_query_embedding is not None
+        ):
+            return self._cached_query_embedding
         try:
             embedding = np.asarray(
                 semantic_similarity.generate_embedding(text_original), dtype=np.float32
@@ -193,6 +203,8 @@ class ReferenceSearchService:
             raise semantic_similarity.EmbeddingGenerationError(
                 "O embedding da consulta deve ser finito, normalizado e compativel com o indice."
             )
+        self._cached_query_text = text_original
+        self._cached_query_embedding = embedding
         return embedding
 
     @staticmethod

@@ -127,3 +127,4 @@ class DocumentAnalysis:
     suspicious_segment_percentage: float
     lexical_ms: int = 0
     semantic_ms: int = 0
+    reference_fingerprint: str | None = None

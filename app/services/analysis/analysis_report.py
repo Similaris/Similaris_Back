@@ -66,6 +66,7 @@ class AnalysisReportService:
             suspicious_segment_percentage=suspicious_percentage,
             lexical_ms=document.lexical_ms or 0,
             semantic_ms=document.semantic_ms or 0,
+            reference_fingerprint=document.reference_fingerprint,
         )
 
     def _segment_analysis(
@@ -80,8 +81,11 @@ class AnalysisReportService:
             matches=matches,
             best_match=best_match,
             segment_score=segment_score,
-            classification=self.score_calculator.classify(segment_score),
-            is_suspicious=any(match.is_suspicious for match in matches),
+            classification=(
+                best_match.classification
+                if best_match else SimilarityClassification.LOW
+            ),
+            is_suspicious=any(result.is_suspicious for result in results),
         )
 
     def _match(self, result: AnalysisResult) -> HybridMatch:
@@ -100,12 +104,6 @@ class AnalysisReportService:
             classification = SimilarityClassification(result.plagiarism_type)
         except ValueError:
             classification = self.score_calculator.classify(final_score)
-        is_suspicious = result.is_suspicious or self.score_calculator.is_suspicious(
-            tfidf_score=tfidf_score,
-            jaccard_score=jaccard_score,
-            semantic_score=semantic_score,
-            final_score=final_score,
-        )
         return HybridMatch(
             reference_document=ReferenceDocumentMatch(
                 id=reference_document.id,
@@ -127,5 +125,5 @@ class AnalysisReportService:
             lexical_score=lexical_score,
             final_score=final_score,
             classification=classification,
-            is_suspicious=is_suspicious,
+            is_suspicious=result.is_suspicious,
         )

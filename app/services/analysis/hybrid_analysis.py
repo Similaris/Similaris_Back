@@ -98,6 +98,7 @@ class _SegmentExecution:
     analysis: SegmentAnalysis
     lexical_ms: float
     semantic_ms: float
+    reference_fingerprint: str
 
 
 def _merge_candidates(
@@ -179,6 +180,9 @@ class HybridAnalysisService:
             suspicious_segment_percentage=_clamp_score(suspicious_percentage),
             lexical_ms=round(sum(execution.lexical_ms for execution in executions)),
             semantic_ms=round(sum(execution.semantic_ms for execution in executions)),
+            reference_fingerprint=(
+                executions[0].reference_fingerprint if executions else None
+            ),
         )
 
     def _analyze_segment(self, segment: Segment) -> _SegmentExecution:
@@ -188,6 +192,8 @@ class HybridAnalysisService:
         semantic_result = self.reference_search.search(
             segment.text_original, mode="semantic"
         )
+        if lexical_result.index_fingerprint != semantic_result.index_fingerprint:
+            raise RuntimeError("O indice de referencia mudou durante a analise.")
         candidates = _merge_candidates(
             (lexical_result.matches, semantic_result.matches)
         )
@@ -213,6 +219,7 @@ class HybridAnalysisService:
             ),
             lexical_ms=lexical_result.comparison_ms,
             semantic_ms=semantic_result.comparison_ms,
+            reference_fingerprint=lexical_result.index_fingerprint,
         )
 
     def _build_match(self, candidate: _MergedCandidate) -> HybridMatch:

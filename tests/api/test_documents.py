@@ -1,4 +1,5 @@
 from app.api.auth import get_current_user
+from app.api import documents as documents_api
 from app.core.config import settings
 from app.main import app
 
@@ -103,3 +104,58 @@ def test_list_segments_of_unknown_document_returns_404(client):
 
     assert response.status_code == 404
     assert "não encontrado" in response.json()["detail"]
+
+
+def test_failed_document_can_be_requeued(client, run_pending_workers, monkeypatch):
+    response = client.post(
+        "/api/documents/upload",
+        files=[("files", ("broken.docx", b"invalid", "application/octet-stream"))],
+    )
+    document_id = response.json()["documents"][0]["id"]
+    run_pending_workers()
+    monkeypatch.setattr(
+        documents_api, "dispatch_document_processing", client.dispatched.append
+    )
+
+    retry = client.post(f"/api/documents/{document_id}/retry")
+
+    assert retry.status_code == 200
+    assert retry.json()["status"] == "pendente"
+    assert retry.json()["error_message"] is None
+    assert client.dispatched == [document_id]
+
+
+def test_completed_document_cannot_be_requeued(client, build_docx, run_pending_workers):
+    response = client.post(
+        "/api/documents/upload",
+        files=[("files", ("paper.docx", build_docx("Text"), "application/octet-stream"))],
+    )
+    document_id = response.json()["documents"][0]["id"]
+    run_pending_workers()
+
+    retry = client.post(f"/api/documents/{document_id}/retry")
+
+    assert retry.status_code == 409
+
+
+def test_retry_publish_failure_returns_service_unavailable(
+    client, run_pending_workers, monkeypatch
+):
+    response = client.post(
+        "/api/documents/upload",
+        files=[("files", ("broken.docx", b"invalid", "application/octet-stream"))],
+    )
+    document_id = response.json()["documents"][0]["id"]
+    run_pending_workers()
+    monkeypatch.setattr(
+        documents_api,
+        "dispatch_document_processing",
+        lambda _document_id: (_ for _ in ()).throw(ConnectionError()),
+    )
+
+    retry = client.post(f"/api/documents/{document_id}/retry")
+
+    assert retry.status_code == 503
+    detail = client.get("/api/batches/1").json()
+    assert detail["status"] == "erro"
+    assert detail["documents"][0]["status"] == "erro"

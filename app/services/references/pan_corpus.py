@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -88,19 +89,25 @@ def iter_documents(directory: Path, kind: DocumentKind) -> Iterator[PanDocument]
     if kind not in ("source", "suspicious"):
         raise ValueError("kind deve ser source ou suspicious.")
     directory = external_corpus_directory(directory)
-    paths = sorted(directory.rglob(f"{kind}-document*.xml"))
-    if not paths:
-        raise PanCorpusError(f"Nenhum XML de documentos {kind} em {directory}.")
+    pattern = re.compile(rf"{kind}-document\d+\.xml")
+    found = False
     seen: set[str] = set()
-    for path in paths:
-        document = read_metadata(path, kind)
-        if document.reference in seen:
-            raise PanCorpusError(
-                f"Referencia duplicada no corpus: {document.reference}. "
-                "Use somente uma copia do corpus externo."
-            )
-        seen.add(document.reference)
-        yield document
+    for root, directories, filenames in os.walk(directory):
+        directories.sort()
+        for filename in sorted(filenames):
+            if not pattern.fullmatch(filename):
+                continue
+            found = True
+            document = read_metadata(Path(root) / filename, kind)
+            if document.reference in seen:
+                raise PanCorpusError(
+                    f"Referencia duplicada no corpus: {document.reference}. "
+                    "Use somente uma copia do corpus externo."
+                )
+            seen.add(document.reference)
+            yield document
+    if not found:
+        raise PanCorpusError(f"Nenhum XML de documentos {kind} em {directory}.")
 
 
 def read_content(document: PanDocument) -> tuple[str, str]:

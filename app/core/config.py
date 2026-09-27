@@ -1,11 +1,13 @@
 from typing import Literal
 
 from pydantic import AliasChoices, Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """Application configuration."""
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_name: str = "Similaris API"
     version: str = "0.1.0"
@@ -63,10 +65,5 @@ class Settings(BaseSettings):
         default=10080,
         validation_alias=AliasChoices("JWT_REFRESH_TOKEN_EXPIRES_IN"),
     )
-
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
-
 
 settings = Settings()
