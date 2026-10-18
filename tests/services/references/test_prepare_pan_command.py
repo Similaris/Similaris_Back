@@ -67,3 +67,9 @@ def test_all_and_limit_are_mutually_exclusive(capsys):
     with pytest.raises(SystemExit) as error:
         main(["import", "--all", "--limit", "20"])
     assert error.value.code == 2
+
+
+def test_corpus_id_and_limit_are_mutually_exclusive(capsys):
+    with pytest.raises(SystemExit) as error:
+        main(["import", "--limit", "20", "--corpus-id", "source-document02239.txt"])
+    assert error.value.code == 2

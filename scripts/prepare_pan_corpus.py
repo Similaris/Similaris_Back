@@ -39,6 +39,10 @@ def create_parser() -> argparse.ArgumentParser:
             selection = child.add_mutually_exclusive_group()
             selection.add_argument("--limit", type=positive_integer, default=100)
             selection.add_argument("--all", action="store_true")
+            selection.add_argument(
+                "--corpus-id",
+                help="Importa somente o identificador completo do documento fonte.",
+            )
             child.add_argument("--max-words", type=positive_integer)
         if command in ("index", "prepare"):
             child.add_argument("--index-dir", type=Path)
@@ -85,7 +89,6 @@ def _database_command(arguments: argparse.Namespace) -> dict:
     from app.core.config import settings
     from app.core.database import Base
     from app.repositories.references import ReferenceRepository
-    from app.services.references.corpus_index import prepare_corpus_index
     from app.services.references.pan_import import import_pan_corpus
 
     url = arguments.database_url or settings.database_url
@@ -103,11 +106,18 @@ def _database_command(arguments: argparse.Namespace) -> dict:
             summary = import_pan_corpus(
                 sessions,
                 arguments.corpus_dir,
-                limit=None if arguments.all else arguments.limit,
+                limit=(
+                    None
+                    if arguments.all or arguments.corpus_id is not None
+                    else arguments.limit
+                ),
                 max_words=arguments.max_words,
+                corpus_id=arguments.corpus_id,
             )
             result["import"] = asdict(summary)
         if arguments.command in ("index", "prepare"):
+            from app.services.references.corpus_index import prepare_corpus_index
+
             directory = arguments.index_dir or Path(settings.reference_index_dir)
             with sessions() as db:
                 preparation = prepare_corpus_index(

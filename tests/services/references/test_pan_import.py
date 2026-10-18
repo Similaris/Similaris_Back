@@ -66,6 +66,37 @@ def test_deterministic_subset_can_be_extended(sessions, corpus_dir, write_pan_do
     assert (result.imported, result.reused) == (1, 1)
 
 
+def test_imports_only_requested_corpus_id(sessions, corpus_dir, write_pan_document):
+    write_pan_document("source-document00304.txt")
+    write_pan_document("source-document02239.txt")
+    result = import_pan_corpus(
+        sessions, corpus_dir, corpus_id="source-document02239.txt"
+    )
+    assert (result.imported, result.reused) == (1, 0)
+    with sessions() as db:
+        ids = list(db.scalars(select(ReferenceDocument.corpus_id)))
+    assert ids == ["source-document02239.txt"]
+
+
+def test_requested_corpus_id_is_reused_without_duplication(
+    sessions, corpus_dir, write_pan_document,
+):
+    write_pan_document("source-document02239.txt")
+    first = import_pan_corpus(sessions, corpus_dir, corpus_id="source-document02239.txt")
+    second = import_pan_corpus(sessions, corpus_dir, corpus_id="source-document02239.txt")
+    assert (first.imported, second.imported, second.reused) == (1, 0, 1)
+    with sessions() as db:
+        assert len(list(db.scalars(select(ReferenceDocument)))) == 1
+
+
+def test_missing_requested_corpus_id_is_reported(
+    sessions, corpus_dir, write_pan_document,
+):
+    write_pan_document("source-document00001.txt")
+    with pytest.raises(PanCorpusError, match="nao encontrado"):
+        import_pan_corpus(sessions, corpus_dir, corpus_id="source-document02239.txt")
+
+
 def test_changed_content_does_not_replace_existing_references(
     sessions, corpus_dir, write_pan_document,
 ):
