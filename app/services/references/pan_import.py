@@ -47,6 +47,7 @@ def import_pan_corpus(
     directory: Path,
     limit: int | None = 100,
     max_words: int | None = None,
+    corpus_id: str | None = None,
 ) -> ImportSummary:
     if limit is not None and limit < 1:
         raise ValueError("limit deve ser maior que zero.")
@@ -56,8 +57,12 @@ def import_pan_corpus(
     directory = external_corpus_directory(directory)
     signature = import_signature(max_words)
     imported = reused = total_segments = 0
+    found_requested = False
 
     for metadata in iter_documents(directory, "source"):
+        if corpus_id is not None and metadata.reference != corpus_id:
+            continue
+        found_requested = True
         if metadata.language != "en":
             continue
         text, content_sha256 = read_content(metadata)
@@ -109,6 +114,10 @@ def import_pan_corpus(
                 total_segments += len(segments)
         if limit is not None and imported + reused >= limit:
             break
+        if corpus_id is not None:
+            break
     if imported + reused == 0:
+        if corpus_id is not None and not found_requested:
+            raise PanCorpusError(f"Documento fonte nao encontrado: {corpus_id}.")
         raise PanCorpusError("Nenhum documento fonte em ingles encontrado.")
     return ImportSummary(imported, reused, total_segments)
