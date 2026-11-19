@@ -2,13 +2,13 @@
 
 Servidor de aplicação do **Similaris**, protótipo web para apoio à detecção de plágio com foco em análise lexical, semântica e processamento em lote.
 
-Projeto desenvolvido como Trabalho de Graduação (TG) do Curso Superior de Tecnologia em Análise e Desenvolvimento de Sistemas da **Faculdade de Tecnologia de Indaiatuba — Dr. Archimedes Lamoglia (FATEC Indaiatuba / Centro Paula Souza)**.
+Projeto desenvolvido como Trabalho de Graduação (TG) do Curso Superior de Tecnologia em Análise e Desenvolvimento de Sistemas da **Faculdade de Tecnologia de Indaiatuba — Dr. Archimedes Lammoglia (FATEC Indaiatuba / Centro Paula Souza)**.
 
 **Autores:**
 - Pedro Henrique Denny Ré
 - Rafael Tadeu Praça
 
-**Orientador:** Prof. Me. Michel Moron Munhoz
+**Orientador:** Prof. Marlon Palata Fanger Rodrigues
 
 ---
 
@@ -463,7 +463,7 @@ python -m scripts.evaluate_pan_retrieval `
     --corpus-dir data\pan-pc-11 `
     --database-url $env:DATABASE_URL `
     --index-dir data\reference-index `
-    --limit 100
+    --limit 50
 ```
 
 A saída apresenta precisão@N, recall@N, F1@N e MRR, além dos casos ignorados
@@ -492,4 +492,12 @@ Independentemente do hook local, o GitHub Actions (`.github/workflows/valida-com
 
 ---
 
-FATEC Indaiatuba — Dr. Archimedes Lamoglia · Centro Estadual de Educação Tecnológica Paula Souza · 2025/2026
+## Contribuição e Licença
+
+Contribuições são bem-vindas! Consulte [CONTRIBUTING.md](CONTRIBUTING.md) para detalhes sobre fluxo de branches, commits e testes.
+
+Este projeto é distribuído sob a **Licença MIT**. Consulte o arquivo [LICENSE](LICENSE) para mais informações.
+
+---
+
+FATEC Indaiatuba — Dr. Archimedes Lammoglia · Centro Estadual de Educação Tecnológica Paula Souza · 2025/2026
