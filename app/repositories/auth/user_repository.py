@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.auth import User
@@ -12,10 +13,11 @@ class UserRepository:
         return self.db.get(User, user_id)
 
     def get_by_email(self, email: str) -> User | None:
-        return self.db.query(User).filter(User.email == email).first()
+        normalized = email.strip().lower()
+        return self.db.query(User).filter(func.lower(User.email) == normalized).first()
 
     def create(self, name: str, email: str, password_hash: str) -> User:
-        user = User(name=name, email=email, password_hash=password_hash)
+        user = User(name=name.strip(), email=email.strip().lower(), password_hash=password_hash)
         self.db.add(user)
         self.db.commit()
         self.db.refresh(user)

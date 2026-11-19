@@ -20,16 +20,18 @@ class AuthService:
         self.users = UserRepository(db)
 
     def register(self, data: UserRegister) -> User:
-        if self.users.get_by_email(data.email):
+        clean_email = data.email.strip().lower()
+        if self.users.get_by_email(clean_email):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail="E-mail já cadastrado."
             )
         return self.users.create(
-            name=data.name, email=data.email, password_hash=hash_password(data.password)
+            name=data.name.strip(), email=clean_email, password_hash=hash_password(data.password)
         )
 
     def login(self, data: UserLogin) -> tuple[str, str, User]:
-        user = self.users.get_by_email(data.email)
+        clean_email = data.email.strip().lower()
+        user = self.users.get_by_email(clean_email)
         if not user or not verify_password(data.password, user.password_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
